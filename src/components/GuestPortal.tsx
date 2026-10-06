@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Building2, 
   Car, 
@@ -15,75 +15,147 @@ import {
   Info,
   Phone,
   Mail,
-  UserCheck
+  UserCheck,
+  MessageCircle,
+  LogOut
 } from 'lucide-react';
-import hotelSuiteImg from '../assets/images/wedding_hotel_suite_1791309120679.jpg';
-import boatTourImg from '../assets/images/wedding_boat_experience_1791309131765.jpg';
+import { WeddingData, HotelItem, TransferItem, ExperienceItem } from '../data/weddingStore';
 
-export default function GuestPortal() {
+interface GuestPortalProps {
+  weddingData: WeddingData;
+  guestInfo: {
+    name: string;
+    email: string;
+    weddingCode: string;
+    provider: 'google' | 'apple' | 'email';
+  };
+  onLogout: () => void;
+  onBookSuccess?: (bookingDetails: any) => void;
+}
+
+export default function GuestPortal({ weddingData, guestInfo, onLogout, onBookSuccess }: GuestPortalProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Stato Modulo Ospite
-  const [selectedHotel, setSelectedHotel] = useState<'tremezzo' | 'serbelloni'>('tremezzo');
-  const [selectedRoom, setSelectedRoom] = useState('Prestige Vista Lago (€490/notte)');
+  // Selezione Hotel
+  const [selectedHotelId, setSelectedHotelId] = useState<string>(weddingData.hotels[0]?.id || '');
+  const [selectedRoomTypeName, setSelectedRoomTypeName] = useState<string>(
+    weddingData.hotels[0]?.roomTypes[0]?.name || 'Camera Standard'
+  );
   const [checkIn, setCheckIn] = useState('2026-06-18');
   const [checkOut, setCheckOut] = useState('2026-06-22');
-  const [specialRequests, setSpecialRequests] = useState('Camera ai piani alti con vista aperta, se possibile.');
+  const [specialRequests, setSpecialRequests] = useState('Camera vista aperta, letto matrimoniale.');
 
-  const [transferOption, setTransferOption] = useState<'shuttle' | 'ncc' | 'none'>('shuttle');
-  const [flightNumber, setFlightNumber] = useState('Delta Air Lines DL112');
+  // Selezione Transfer
+  const [selectedTransferId, setSelectedTransferId] = useState<string>(weddingData.transfers[0]?.id || '');
+  const [flightNumber, setFlightNumber] = useState('Delta DL112');
   const [flightArrivalDate, setFlightArrivalDate] = useState('2026-06-18 08:45');
-  const [luggageCount, setLuggageCount] = useState(3);
+  const [luggageCount, setLuggageCount] = useState(2);
 
-  const [selectedExperiences, setSelectedExperiences] = useState<string[]>([
-    'exp-boat-sunset',
-    'exp-welcome-pizza'
-  ]);
+  // Selezione Esperienze
+  const [selectedExperienceIds, setSelectedExperienceIds] = useState<string[]>([
+    weddingData.experiences[0]?.id || ''
+  ].filter(Boolean));
+
+  // Sincronizza selezione se cambia il weddingData
+  useEffect(() => {
+    if (weddingData.hotels[0]) {
+      setSelectedHotelId(weddingData.hotels[0].id);
+      setSelectedRoomTypeName(weddingData.hotels[0].roomTypes[0]?.name || '');
+    }
+    if (weddingData.transfers[0]) {
+      setSelectedTransferId(weddingData.transfers[0].id);
+    }
+  }, [weddingData]);
+
+  const currentHotel = weddingData.hotels.find(h => h.id === selectedHotelId) || weddingData.hotels[0];
+  const currentTransfer = weddingData.transfers.find(t => t.id === selectedTransferId) || weddingData.transfers[0];
 
   const toggleExperience = (id: string) => {
-    if (selectedExperiences.includes(id)) {
-      setSelectedExperiences(selectedExperiences.filter(item => item !== id));
+    if (selectedExperienceIds.includes(id)) {
+      setSelectedExperienceIds(selectedExperienceIds.filter(item => item !== id));
     } else {
-      setSelectedExperiences([...selectedExperiences, id]);
+      setSelectedExperienceIds([...selectedExperienceIds, id]);
     }
   };
 
   const handleComplete = () => {
     setIsSubmitted(true);
     setCurrentStep(4);
+    if (onBookSuccess) {
+      onBookSuccess({
+        guestName: guestInfo.name,
+        email: guestInfo.email,
+        hotel: currentHotel?.name,
+        roomType: selectedRoomTypeName,
+        transfer: currentTransfer?.title,
+        flight: flightNumber,
+        experiences: selectedExperienceIds
+      });
+    }
+  };
+
+  const openConciergeWhatsApp = () => {
+    const text = encodeURIComponent(
+      `Ciao! Sono ${guestInfo.name}, ospite del matrimonio di ${weddingData.coupleNames} (Codice: ${weddingData.weddingCode}). Avrei bisogno di assistenza per il mio soggiorno.`
+    );
+    window.open(`https://wa.me/${weddingData.conciergeWhatsApp.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
   };
 
   return (
     <div className="space-y-6">
       {/* Intestazione Ospite Estero */}
-      <div className="border border-neutral-200 rounded-lg p-6 bg-white shadow-xs">
+      <div className="border border-neutral-200 rounded-2xl p-6 md:p-8 bg-white shadow-xs space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 uppercase tracking-wider">
               <span>Portale Ospite Internazionale</span>
               <span aria-hidden="true">·</span>
-              <span>English / Italiano</span>
+              <span>Autenticato con {guestInfo.provider.toUpperCase()}</span>
             </div>
-            <h2 className="text-2xl font-serif-luxury font-bold text-neutral-900 mt-1">
-              Benvenuti Eleanor & Jonathan Vance
-            </h2>
+            <h1 className="text-2xl sm:text-3xl font-serif-luxury font-bold text-neutral-900 mt-1">
+              Benvenuto, {guestInfo.name}
+            </h1>
             <p className="text-sm text-neutral-600 mt-1">
-              Siete invitati al matrimonio di <strong className="text-neutral-900">Emma Watson & Alexander Sterling</strong> a Villa Balbianello, Lago di Como.
+              Sei invitato alle nozze di <strong className="text-neutral-900">{weddingData.coupleNames}</strong> a {weddingData.venue} ({weddingData.city}, {weddingData.country}).
             </p>
           </div>
 
-          <div className="px-3.5 py-2 bg-amber-50 rounded-lg border border-amber-200/60 text-xs text-amber-900 shrink-0">
-            <span className="font-semibold">Concierge Dedicato H24:</span>
-            <div className="text-[11px] text-amber-800 mt-0.5">concierge@rivieraweddings.com · +39 031 998877</div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={openConciergeWhatsApp}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200/80 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-600" />
+              <span>Concierge WhatsApp</span>
+            </button>
+
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-100 rounded-lg transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Esci</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Messaggio di Benvenuto della Coppia */}
+        <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/60 text-xs text-amber-900 flex items-start gap-3">
+          <Sparkles className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold">Messaggio di Emma & Alexander per te:</span>
+            <p className="leading-relaxed text-amber-950/90 italic">
+              "{weddingData.welcomeMessage}"
+            </p>
           </div>
         </div>
 
         {/* Stepper Wizard Indicator */}
-        <div className="grid grid-cols-4 gap-2 mt-6 pt-6 border-t border-neutral-100 text-xs">
+        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-neutral-100 text-xs">
           <button
             onClick={() => setCurrentStep(1)}
-            className={`p-2.5 rounded-md text-left transition-colors flex items-center gap-2 ${
+            className={`p-2.5 rounded-lg text-left transition-colors flex items-center gap-2 ${
               currentStep === 1
                 ? 'bg-neutral-900 text-white'
                 : currentStep > 1
@@ -94,12 +166,12 @@ export default function GuestPortal() {
             <span className="w-5 h-5 rounded-full border flex items-center justify-center font-bold text-[10px]">
               {currentStep > 1 ? '✓' : '1'}
             </span>
-            <span className="font-medium truncate hidden sm:inline">1. Hotel & Camera</span>
+            <span className="font-medium truncate hidden sm:inline">1. Alloggio Convenzionato</span>
           </button>
 
           <button
             onClick={() => setCurrentStep(2)}
-            className={`p-2.5 rounded-md text-left transition-colors flex items-center gap-2 ${
+            className={`p-2.5 rounded-lg text-left transition-colors flex items-center gap-2 ${
               currentStep === 2
                 ? 'bg-neutral-900 text-white'
                 : currentStep > 2
@@ -115,7 +187,7 @@ export default function GuestPortal() {
 
           <button
             onClick={() => setCurrentStep(3)}
-            className={`p-2.5 rounded-md text-left transition-colors flex items-center gap-2 ${
+            className={`p-2.5 rounded-lg text-left transition-colors flex items-center gap-2 ${
               currentStep === 3
                 ? 'bg-neutral-900 text-white'
                 : currentStep > 3
@@ -126,12 +198,12 @@ export default function GuestPortal() {
             <span className="w-5 h-5 rounded-full border flex items-center justify-center font-bold text-[10px]">
               {currentStep > 3 ? '✓' : '3'}
             </span>
-            <span className="font-medium truncate hidden sm:inline">3. Esperienze Sul Lago</span>
+            <span className="font-medium truncate hidden sm:inline">3. Esperienze & Party</span>
           </button>
 
           <button
             onClick={() => setCurrentStep(4)}
-            className={`p-2.5 rounded-md text-left transition-colors flex items-center gap-2 ${
+            className={`p-2.5 rounded-lg text-left transition-colors flex items-center gap-2 ${
               currentStep === 4
                 ? 'bg-neutral-900 text-white'
                 : 'text-neutral-400 bg-neutral-50'
@@ -145,137 +217,111 @@ export default function GuestPortal() {
         </div>
       </div>
 
-      {/* STEP 1: SCELTA HOTEL & ALLOGGIO */}
+      {/* ========================================================================= */}
+      {/* STEP 1: SCELTA HOTEL                                                     */}
+      {/* ========================================================================= */}
       {currentStep === 1 && (
-        <div className="border border-neutral-200 rounded-lg p-6 bg-white shadow-xs space-y-6">
+        <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
           <div>
-            <h3 className="text-lg font-serif-luxury font-bold text-neutral-900">
-              Seleziona la Sistemazione Convenzionata
-            </h3>
+            <h2 className="text-xl font-serif-luxury font-bold text-neutral-900">
+              Hotel Convenzionati e Tariffe Riservate
+            </h2>
             <p className="text-xs text-neutral-600 mt-1">
-              Emma & Alexander hanno concordato un blocco camere a tariffa riservata e un servizio di navetta dedicato da questi due hotel fino a Villa Balbianello.
+              Abbiamo bloccato camere con tariffe agevolate dedicate agli invitati di {weddingData.coupleNames}.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Grand Hotel Tremezzo */}
-            <div 
-              onClick={() => setSelectedHotel('tremezzo')}
-              className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
-                selectedHotel === 'tremezzo' 
-                  ? 'border-neutral-900 bg-neutral-50/50 shadow-xs' 
-                  : 'border-neutral-200 hover:border-neutral-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Consigliato dalla Coppia</span>
-                <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedHotel === 'tremezzo' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                  {selectedHotel === 'tremezzo' && <Check className="w-2.5 h-2.5" />}
-                </span>
-              </div>
-              <h4 className="text-base font-serif-luxury font-bold text-neutral-900 mt-2">
-                Grand Hotel Tremezzo (5 Stelle Lusso)
-              </h4>
-              <p className="text-xs text-neutral-600 mt-1">
-                Tremezzina · Navetta via lago e via terra inclusa per il giorno delle nozze.
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {weddingData.hotels.map((h) => {
+              const isSelected = selectedHotelId === h.id;
+              return (
+                <div
+                  key={h.id}
+                  onClick={() => {
+                    setSelectedHotelId(h.id);
+                    setSelectedRoomTypeName(h.roomTypes[0]?.name || '');
+                  }}
+                  className={`cursor-pointer rounded-xl border-2 p-5 transition-all flex flex-col justify-between ${
+                    isSelected
+                      ? 'border-neutral-900 bg-neutral-50/60 shadow-xs'
+                      : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                        {h.stars} Stelle · €{h.negotiatedRate} / notte
+                      </span>
+                      <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
+                        {isSelected && <Check className="w-2.5 h-2.5" />}
+                      </span>
+                    </div>
 
-              <div className="mt-4 space-y-2 text-xs">
-                <label className="flex items-center gap-2 p-2 bg-white rounded border border-neutral-200">
-                  <input 
-                    type="radio" 
-                    name="room" 
-                    checked={selectedRoom.includes('Prestige')} 
-                    onChange={() => setSelectedRoom('Prestige Vista Lago (€490/notte)')} 
-                  />
-                  <div className="flex-1 flex justify-between">
-                    <span>Prestige Vista Lago</span>
-                    <span className="font-mono font-bold text-neutral-900">€490 / notte</span>
+                    <h3 className="text-base font-serif-luxury font-bold text-neutral-900">{h.name}</h3>
+                    <p className="text-xs text-neutral-500 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-neutral-400" />
+                      <span>{h.address}</span>
+                    </p>
+                    <p className="text-xs text-neutral-600 italic">{h.distanceToVenue}</p>
                   </div>
-                </label>
 
-                <label className="flex items-center gap-2 p-2 bg-white rounded border border-neutral-200">
-                  <input 
-                    type="radio" 
-                    name="room" 
-                    checked={selectedRoom.includes('Deluxe')} 
-                    onChange={() => setSelectedRoom('Deluxe Suite Terrazza (€780/notte)')} 
-                  />
-                  <div className="flex-1 flex justify-between">
-                    <span>Deluxe Suite Terrazza</span>
-                    <span className="font-mono font-bold text-neutral-900">€780 / notte</span>
+                  {/* Scelta Tipologia Camere */}
+                  <div className="mt-4 pt-4 border-t border-neutral-200/80 space-y-2 text-xs">
+                    <span className="font-semibold text-neutral-700 block text-[11px] uppercase tracking-wider">
+                      Tipologie Camere nel Blocco:
+                    </span>
+                    {h.roomTypes.map((rt) => (
+                      <label key={rt.id} className="flex items-center gap-2 p-2 bg-white rounded border border-neutral-200">
+                        <input
+                          type="radio"
+                          name="roomType"
+                          checked={selectedRoomTypeName === rt.name}
+                          onChange={() => setSelectedRoomTypeName(rt.name)}
+                        />
+                        <div className="flex-1 flex justify-between">
+                          <span>{rt.name}</span>
+                          <span className="font-mono font-bold text-neutral-900">€{rt.pricePerNight} / notte</span>
+                        </div>
+                      </label>
+                    ))}
                   </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Villa Serbelloni */}
-            <div 
-              onClick={() => setSelectedHotel('serbelloni')}
-              className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
-                selectedHotel === 'serbelloni' 
-                  ? 'border-neutral-900 bg-neutral-50/50 shadow-xs' 
-                  : 'border-neutral-200 hover:border-neutral-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Bellagio Centro</span>
-                <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedHotel === 'serbelloni' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                  {selectedHotel === 'serbelloni' && <Check className="w-2.5 h-2.5" />}
-                </span>
-              </div>
-              <h4 className="text-base font-serif-luxury font-bold text-neutral-900 mt-2">
-                Grand Hotel Villa Serbelloni
-              </h4>
-              <p className="text-xs text-neutral-600 mt-1">
-                Bellagio · Servizio motoscafo privato dedicato per la cerimonia.
-              </p>
-
-              <div className="mt-4 space-y-2 text-xs">
-                <label className="flex items-center gap-2 p-2 bg-white rounded border border-neutral-200">
-                  <input 
-                    type="radio" 
-                    name="room" 
-                    checked={selectedRoom.includes('Classic')} 
-                    onChange={() => setSelectedRoom('Classic Double Garden View (€320/notte)')} 
-                  />
-                  <div className="flex-1 flex justify-between">
-                    <span>Classic Double Garden</span>
-                    <span className="font-mono font-bold text-neutral-900">€320 / notte</span>
-                  </div>
-                </label>
-              </div>
-            </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Date & Note Speciali */}
+          {/* Date di Soggiorno */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-neutral-200 text-xs">
             <div>
-              <label className="block text-neutral-700 font-medium mb-1">Data Check-In</label>
-              <input 
-                type="date" 
-                value={checkIn} 
+              <label className="block text-neutral-700 font-semibold mb-1">Data Check-In</label>
+              <input
+                type="date"
+                value={checkIn}
                 onChange={(e) => setCheckIn(e.target.value)}
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
               />
             </div>
+
             <div>
-              <label className="block text-neutral-700 font-medium mb-1">Data Check-Out</label>
-              <input 
-                type="date" 
-                value={checkOut} 
+              <label className="block text-neutral-700 font-semibold mb-1">Data Check-Out</label>
+              <input
+                type="date"
+                value={checkOut}
                 onChange={(e) => setCheckOut(e.target.value)}
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
               />
             </div>
+
             <div className="sm:col-span-2">
-              <label className="block text-neutral-700 font-medium mb-1">Richieste Particolari (Culla, mobilità, piano alto)</label>
-              <input 
-                type="text" 
-                value={specialRequests} 
+              <label className="block text-neutral-700 font-semibold mb-1">
+                Richieste Speciali per l'Hotel (Letti separati, culla, piano alto)
+              </label>
+              <input
+                type="text"
+                value={specialRequests}
                 onChange={(e) => setSpecialRequests(e.target.value)}
-                placeholder="Es. Letto matrimoniale king, vista aperta..."
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                placeholder="Es. Letto matrimoniale, arrivo in tarda serata..."
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
               />
             </div>
           </div>
@@ -283,7 +329,7 @@ export default function GuestPortal() {
           <div className="flex justify-end pt-4 border-t border-neutral-200">
             <button
               onClick={() => setCurrentStep(2)}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
             >
               <span>Continua: Seleziona Transfer</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -292,95 +338,87 @@ export default function GuestPortal() {
         </div>
       )}
 
-      {/* STEP 2: SCELTA TRASFERIMENTO AEROPORTO */}
+      {/* ========================================================================= */}
+      {/* STEP 2: SCELTA TRASFERIMENTI AEROPORTO                                    */}
+      {/* ========================================================================= */}
       {currentStep === 2 && (
-        <div className="border border-neutral-200 rounded-lg p-6 bg-white shadow-xs space-y-6">
+        <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
           <div>
-            <h3 className="text-lg font-serif-luxury font-bold text-neutral-900">
-              Trasferimenti Aeroportuali & Logistica Arrivo
-            </h3>
+            <h2 className="text-xl font-serif-luxury font-bold text-neutral-900">
+              Trasferimenti e Navette Aeroporto
+            </h2>
             <p className="text-xs text-neutral-600 mt-1">
-              Il nostro team concierge accoglie gli ospiti direttamente al gate arrivi e organizza il trasferimento con veicoli Mercedes fino all'hotel.
+              Conducenti professionisti con cartello nominativo ti attenderanno all'uscita dogana del tuo volo.
             </p>
           </div>
 
           <div className="space-y-3">
-            <div 
-              onClick={() => setTransferOption('shuttle')}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all flex items-start justify-between ${
-                transferOption === 'shuttle' ? 'border-neutral-900 bg-neutral-50/50' : 'border-neutral-200'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded">Navetta di Gruppo VIP</span>
-                  <span className="text-xs font-mono font-bold text-neutral-900">€45 / passeggero</span>
-                </div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  Mercedes Sprinter Luxury da Milano Malpensa (MXP)
-                </div>
-                <div className="text-xs text-neutral-600">
-                  Partenze coordinate con i voli: ore 11:00, 15:30 e 19:30. Conducente con cartello nominativo al Terminal 1.
-                </div>
-              </div>
-              <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${transferOption === 'shuttle' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                {transferOption === 'shuttle' && <Check className="w-2.5 h-2.5" />}
-              </span>
-            </div>
+            {weddingData.transfers.map((t) => {
+              const isSelected = selectedTransferId === t.id;
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTransferId(t.id)}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-start justify-between ${
+                    isSelected ? 'border-neutral-900 bg-neutral-50/60' : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded">
+                        {t.type}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-neutral-900">
+                        {t.isPaidByCouple ? 'Incluso (Offerto dagli sposi)' : `€${t.pricePerSeat} / passeggero`}
+                      </span>
+                    </div>
 
-            <div 
-              onClick={() => setTransferOption('ncc')}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all flex items-start justify-between ${
-                transferOption === 'ncc' ? 'border-neutral-900 bg-neutral-50/50' : 'border-neutral-200'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">NCC Privato Dedicato</span>
-                  <span className="text-xs font-mono font-bold text-neutral-900">€220 per vettura</span>
+                    <h3 className="text-sm font-semibold text-neutral-900">{t.title}</h3>
+                    <p className="text-xs text-neutral-600">
+                      Da: {t.origin} → A: {t.destination} ({t.vehicleType})
+                    </p>
+                    <p className="text-xs text-neutral-500 font-mono">Orari: {t.departureTime}</p>
+                  </div>
+
+                  <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${isSelected ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
+                    {isSelected && <Check className="w-2.5 h-2.5" />}
+                  </span>
                 </div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  Mercedes Classe E o Classe V Esclusiva (Qualsiasi Aeroporto / Qualsiasi Orario)
-                </div>
-                <div className="text-xs text-neutral-600">
-                  Autista personale in attesa all'orario effettivo del volo. Nessuna attesa di altri passeggeri.
-                </div>
-              </div>
-              <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${transferOption === 'ncc' ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                {transferOption === 'ncc' && <Check className="w-2.5 h-2.5" />}
-              </span>
-            </div>
+              );
+            })}
           </div>
 
-          {/* Dettagli Volo */}
+          {/* Dettagli del Volo */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-neutral-200 text-xs">
             <div>
-              <label className="block text-neutral-700 font-medium mb-1">Numero di Volo & Compagnia</label>
-              <input 
-                type="text" 
-                value={flightNumber} 
+              <label className="block text-neutral-700 font-semibold mb-1">Numero Volo & Compagnia</label>
+              <input
+                type="text"
+                value={flightNumber}
                 onChange={(e) => setFlightNumber(e.target.value)}
-                placeholder="Es. Delta DL112 / British BA562"
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                placeholder="Es. Delta DL112 o British BA562"
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
               />
             </div>
+
             <div>
-              <label className="block text-neutral-700 font-medium mb-1">Data & Orario Arrivo Previsto</label>
-              <input 
-                type="text" 
-                value={flightArrivalDate} 
+              <label className="block text-neutral-700 font-semibold mb-1">Data & Orario Arrivo</label>
+              <input
+                type="text"
+                value={flightArrivalDate}
                 onChange={(e) => setFlightArrivalDate(e.target.value)}
                 placeholder="18 Giugno 2026 - 08:45"
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
               />
             </div>
+
             <div>
-              <label className="block text-neutral-700 font-medium mb-1">Numero Valigie Totali</label>
-              <input 
-                type="number" 
-                value={luggageCount} 
+              <label className="block text-neutral-700 font-semibold mb-1">Numero Valigie</label>
+              <input
+                type="number"
+                value={luggageCount}
                 onChange={(e) => setLuggageCount(Number(e.target.value))}
-                className="w-full p-2 border border-neutral-300 rounded focus:outline-hidden"
+                className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded font-mono"
               />
             </div>
           </div>
@@ -388,7 +426,7 @@ export default function GuestPortal() {
           <div className="flex justify-between pt-4 border-t border-neutral-200">
             <button
               onClick={() => setCurrentStep(1)}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Indietro</span>
@@ -396,7 +434,7 @@ export default function GuestPortal() {
 
             <button
               onClick={() => setCurrentStep(3)}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
             >
               <span>Continua: Seleziona Esperienze</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -405,105 +443,60 @@ export default function GuestPortal() {
         </div>
       )}
 
-      {/* STEP 3: SELEZIONE ESPERIENZE PRE/POST MATRIMONIO */}
+      {/* ========================================================================= */}
+      {/* STEP 3: SELEZIONE ESPERIENZE                                             */}
+      {/* ========================================================================= */}
       {currentStep === 3 && (
-        <div className="border border-neutral-200 rounded-lg p-6 bg-white shadow-xs space-y-6">
+        <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
           <div>
-            <h3 className="text-lg font-serif-luxury font-bold text-neutral-900">
-              Esperienze sul Lago & Eventi del Matrimonio
-            </h3>
+            <h2 className="text-xl font-serif-luxury font-bold text-neutral-900">
+              Esperienze e Attività Curate per gli Invitati
+            </h2>
             <p className="text-xs text-neutral-600 mt-1">
-              Unitevi alla coppia e agli altri ospiti per scoprire la bellezza del Lago di Como.
+              Seleziona le attività a cui desideri partecipare prima o dopo il giorno del matrimonio.
             </p>
           </div>
 
           <div className="space-y-4">
-            {/* Esperienza 1: Sunset Cruise */}
-            <div 
-              onClick={() => toggleExperience('exp-boat-sunset')}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all flex items-start gap-4 ${
-                selectedExperiences.includes('exp-boat-sunset') ? 'border-neutral-900 bg-neutral-50/50' : 'border-neutral-200'
-              }`}
-            >
-              <div className="w-20 h-20 rounded overflow-hidden shrink-0 hidden sm:block">
-                <img src={boatTourImg} alt="Sunset Riva" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">19 Giugno · 18:00</span>
-                  <span className="font-mono font-bold text-xs text-neutral-900">€110 / persona</span>
-                </div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  Sunset Cruise su Motoscafo Riva d'Epoca & Champagne
-                </div>
-                <p className="text-xs text-neutral-600">
-                  Tour guidato delle ville storiche del centro lago, con sosta per ammirare il tramonto di fronte a Villa Balbianello.
-                </p>
-              </div>
-              <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${selectedExperiences.includes('exp-boat-sunset') ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                {selectedExperiences.includes('exp-boat-sunset') && <Check className="w-2.5 h-2.5" />}
-              </span>
-            </div>
+            {weddingData.experiences.map((exp) => {
+              const isSelected = selectedExperienceIds.includes(exp.id);
+              return (
+                <div
+                  key={exp.id}
+                  onClick={() => toggleExperience(exp.id)}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-start justify-between gap-4 ${
+                    isSelected ? 'border-neutral-900 bg-neutral-50/60' : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                        {exp.eventDate} · {exp.startTime}
+                      </span>
+                      <span className="font-mono font-bold text-xs text-neutral-900">
+                        {exp.isHostSponsored ? 'Gratuito (Offerto dagli sposi)' : `€${exp.pricePerPerson} / persona`}
+                      </span>
+                    </div>
 
-            {/* Esperienza 2: Welcome Pizza Party */}
-            <div 
-              onClick={() => toggleExperience('exp-welcome-pizza')}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all flex items-start gap-4 ${
-                selectedExperiences.includes('exp-welcome-pizza') ? 'border-neutral-900 bg-neutral-50/50' : 'border-neutral-200'
-              }`}
-            >
-              <div className="w-20 h-20 rounded overflow-hidden shrink-0 hidden sm:block bg-neutral-100">
-                <img src={hotelSuiteImg} alt="Pizza Party" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">19 Giugno · 20:30</span>
-                  <span className="text-xs font-bold text-emerald-700">Offerto dagli Sposi (Gratuito)</span>
-                </div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  Welcome Pizza & Wine Party all'Aperto
-                </div>
-                <p className="text-xs text-neutral-600">
-                  Cena informale con forni a legna per pizza napoletana e musica dal vivo sulla terrazza panoramica di Bellagio.
-                </p>
-              </div>
-              <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${selectedExperiences.includes('exp-welcome-pizza') ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                {selectedExperiences.includes('exp-welcome-pizza') && <Check className="w-2.5 h-2.5" />}
-              </span>
-            </div>
+                    <h3 className="text-sm font-semibold text-neutral-900">{exp.title}</h3>
+                    <p className="text-xs text-neutral-600 leading-relaxed">{exp.description}</p>
+                    <div className="text-[11px] text-neutral-500 pt-1">
+                      Ritrovo: {exp.meetingPoint} · {exp.bookedParticipants} / {exp.maxParticipants} posti occupati
+                    </div>
+                  </div>
 
-            {/* Esperienza 3: Masterclass Pasta */}
-            <div 
-              onClick={() => toggleExperience('exp-cooking-class')}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all flex items-start gap-4 ${
-                selectedExperiences.includes('exp-cooking-class') ? 'border-neutral-900 bg-neutral-50/50' : 'border-neutral-200'
-              }`}
-            >
-              <div className="w-20 h-20 rounded overflow-hidden shrink-0 hidden sm:block bg-neutral-100">
-                <div className="w-full h-full bg-amber-100 flex items-center justify-center text-amber-800 text-xs font-bold">Pasta</div>
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">21 Giugno · 11:00</span>
-                  <span className="font-mono font-bold text-xs text-neutral-900">€85 / persona</span>
+                  <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${isSelected ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
+                    {isSelected && <Check className="w-2.5 h-2.5" />}
+                  </span>
                 </div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  Pasta Fresca & Tiramisù Masterclass in Dimora Storica
-                </div>
-                <p className="text-xs text-neutral-600">
-                  Lezione pratica con chef locale per imparare la pasta all'uovo tradizionale e pranzo vista lago.
-                </p>
-              </div>
-              <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-1 ${selectedExperiences.includes('exp-cooking-class') ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'}`}>
-                {selectedExperiences.includes('exp-cooking-class') && <Check className="w-2.5 h-2.5" />}
-              </span>
-            </div>
+              );
+            })}
           </div>
 
           <div className="flex justify-between pt-4 border-t border-neutral-200">
             <button
               onClick={() => setCurrentStep(2)}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Indietro</span>
@@ -511,89 +504,88 @@ export default function GuestPortal() {
 
             <button
               onClick={handleComplete}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
             >
-              <span>Conferma & Genera Voucher</span>
+              <span>Conferma e Genera Voucher</span>
               <Check className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4: RIEPILOGO & VOUCHER DI PRENOTAZIONE */}
+      {/* ========================================================================= */}
+      {/* STEP 4: RIEPILOGO & VOUCHER                                              */}
+      {/* ========================================================================= */}
       {currentStep === 4 && (
-        <div className="border border-neutral-200 rounded-lg p-6 bg-white shadow-xs space-y-6">
-          <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+        <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Prenotazione Registrata nel Database Concierge</span>
+                <span>Prenotazione Salvata con Successo per {guestInfo.name}</span>
               </div>
-              <h3 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1">
-                Voucher di Viaggio & Itinerario Ufficiale
-              </h3>
+              <h2 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1">
+                Voucher di Viaggio Ufficiale
+              </h2>
             </div>
 
             <div className="text-right">
-              <div className="text-[11px] text-neutral-400 uppercase tracking-wider">Codice Voucher</div>
-              <div className="text-sm font-mono font-bold text-neutral-900">VOUCH-EWAS-2026</div>
+              <div className="text-[11px] text-neutral-400 uppercase tracking-wider">Codice Prenotazione</div>
+              <div className="text-sm font-mono font-bold text-neutral-900">
+                {weddingData.weddingCode}-VOUCH
+              </div>
             </div>
           </div>
 
-          {/* Dettagli della Prenotazione */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200">
-              <div className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-neutral-600" />
                 <span>Hotel Riservato</span>
-              </div>
-              <div className="text-sm font-bold text-neutral-900 mt-1">
-                {selectedHotel === 'tremezzo' ? 'Grand Hotel Tremezzo (5★)' : 'Villa Serbelloni Palace (5★)'}
-              </div>
-              <div className="text-neutral-600 mt-1">{selectedRoom}</div>
-              <div className="text-neutral-500 text-[11px] mt-2">
+              </span>
+              <div className="text-sm font-bold text-neutral-900">{currentHotel?.name}</div>
+              <div className="text-neutral-600">{selectedRoomTypeName}</div>
+              <div className="text-neutral-500 text-[11px] pt-1">
                 Check-in: {checkIn} · Check-out: {checkOut}
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200">
-              <div className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                 <Car className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Trasferimento Aeroporto</span>
-              </div>
-              <div className="text-sm font-bold text-neutral-900 mt-1">
-                {transferOption === 'shuttle' ? 'Navetta di Gruppo VIP (MXP)' : 'NCC Privato Mercedes'}
-              </div>
-              <div className="text-neutral-600 mt-1 font-mono">{flightNumber}</div>
-              <div className="text-neutral-500 text-[11px] mt-2">
-                Arrivo: {flightArrivalDate} · {luggageCount} Bagagli
+                <span>Trasferimento Selezionato</span>
+              </span>
+              <div className="text-sm font-bold text-neutral-900">{currentTransfer?.title}</div>
+              <div className="text-neutral-600 font-mono">Volo: {flightNumber}</div>
+              <div className="text-neutral-500 text-[11px] pt-1">
+                Orario arrivo: {flightArrivalDate} · {luggageCount} Valigie
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200">
-              <div className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Esperienze Selezionate</span>
+                <span>Esperienze Confermate</span>
+              </span>
+              <div className="text-sm font-bold text-neutral-900">
+                {selectedExperienceIds.length} Attività nel Programma
               </div>
-              <div className="text-sm font-bold text-neutral-900 mt-1">
-                {selectedExperiences.length} Attività in Programma
-              </div>
-              <ul className="text-neutral-600 mt-1 space-y-0.5 list-disc list-inside">
-                {selectedExperiences.includes('exp-boat-sunset') && <li>Sunset Riva Boat Cruise</li>}
-                {selectedExperiences.includes('exp-welcome-pizza') && <li>Welcome Pizza Party</li>}
-                {selectedExperiences.includes('exp-cooking-class') && <li>Pasta Masterclass</li>}
+              <ul className="text-neutral-600 space-y-0.5 list-disc list-inside pt-1">
+                {selectedExperienceIds.map(id => {
+                  const exp = weddingData.experiences.find(e => e.id === id);
+                  return exp ? <li key={id}>{exp.title}</li> : null;
+                })}
               </ul>
             </div>
           </div>
 
-          {/* Istruzioni Arrivo */}
-          <div className="p-4 rounded-lg bg-amber-50/70 border border-amber-200/60 text-xs space-y-2">
-            <div className="font-bold text-amber-900 flex items-center gap-2">
-              <Info className="w-4 h-4 text-amber-700" />
-              <span>Istruzioni per l'Accoglienza al Vostro Arrivo a Milano</span>
-            </div>
-            <p className="text-amber-800 leading-relaxed">
-              Dopo aver ritirato i bagagli e superato i controlli doganali, troverete il nostro autista accreditato che espone un cartello con la scritta <strong className="text-amber-950">"WATSON & STERLING WEDDING - MR. VANCE"</strong>. In caso di ritardo del volo, il nostro sistema monitora automaticamente il numero <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-900">{flightNumber}</code>.
+          <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs space-y-2">
+            <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+              <MessageCircle className="w-4 h-4 text-emerald-700" />
+              <span>Contatto Diretto Concierge sul Posto</span>
+            </span>
+            <p className="text-emerald-900 leading-relaxed">
+              In caso di variazioni di volo, ritardi o richieste speciali, contatta il team concierge al numero WhatsApp <strong className="font-mono">{weddingData.conciergeWhatsApp}</strong> o via email a <strong className="font-mono">{weddingData.conciergeEmail}</strong>.
             </p>
           </div>
 
@@ -602,15 +594,15 @@ export default function GuestPortal() {
               onClick={() => setCurrentStep(1)}
               className="text-xs text-neutral-600 hover:text-neutral-900 font-medium"
             >
-              ← Modifica Dati o Sistemazione
+              ← Modifica Scelte
             </button>
 
             <button
-              onClick={() => alert('Voucher inviato via email a eleanor.vance@nycapital.com e notificato all\'agenzia!')}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors"
+              onClick={() => alert(`Voucher inviato a ${guestInfo.email} e notificato all'agenzia concierge!`)}
+              className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Salva e Invia Voucher via Email</span>
+              <span>Scarica / Invia Voucher via Email</span>
             </button>
           </div>
         </div>

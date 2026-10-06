@@ -11,30 +11,86 @@ import {
   Check, 
   Download,
   ExternalLink,
-  Users
+  Users,
+  Lock,
+  Globe,
+  LogOut,
+  ShieldCheck,
+  MessageCircle
 } from 'lucide-react';
-import ProjectExplorer from './components/ProjectExplorer';
-import AgencyDashboard from './components/AgencyDashboard';
+import HomeLogin from './components/HomeLogin';
+import AdminPanel from './components/AdminPanel';
 import GuestPortal from './components/GuestPortal';
+import AgencyDashboard from './components/AgencyDashboard';
+import ProjectExplorer from './components/ProjectExplorer';
 import ApiPlayground from './components/ApiPlayground';
+import { INITIAL_WEDDINGS, WeddingData } from './data/weddingStore';
 import { DIRECTORY_TREE, PROJECT_FILES } from './data/projectData';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'architecture' | 'dashboard' | 'guest' | 'api'>('architecture');
+  const [weddings, setWeddings] = useState<WeddingData[]>(INITIAL_WEDDINGS);
+
+  // Stato Autenticazione Utente
+  const [authRole, setAuthRole] = useState<'guest' | 'admin' | null>(null);
+  const [currentGuest, setCurrentGuest] = useState<{
+    name: string;
+    email: string;
+    weddingCode: string;
+    provider: 'google' | 'apple' | 'email';
+  } | null>(null);
+
+  // Vista Attiva
+  const [currentView, setCurrentView] = useState<'home' | 'guest' | 'admin' | 'dashboard' | 'architecture' | 'api'>('home');
   const [copiedServerJs, setCopiedServerJs] = useState(false);
 
-  const serverJsFile = PROJECT_FILES.find(f => f.id === 'server-js');
+  // Gestione Login Ospite
+  const handleGuestLogin = (guestInfo: { name: string; email: string; weddingCode: string; provider: 'google' | 'apple' | 'email' }) => {
+    setAuthRole('guest');
+    setCurrentGuest(guestInfo);
+    setCurrentView('guest');
+  };
+
+  // Gestione Login Amministratore Agenzia
+  const handleAdminLogin = () => {
+    setAuthRole('admin');
+    setCurrentGuest(null);
+    setCurrentView('admin');
+  };
+
+  // Logout
+  const handleLogout = () => {
+    setAuthRole(null);
+    setCurrentGuest(null);
+    setCurrentView('home');
+  };
+
+  // Preview ospite dal pannello admin
+  const handlePreviewAsGuest = (code: string) => {
+    setAuthRole('guest');
+    setCurrentGuest({
+      name: 'Eleanor Vance (Anteprima Staff)',
+      email: 'staff@weddingconcierge.it',
+      weddingCode: code,
+      provider: 'google'
+    });
+    setCurrentView('guest');
+  };
+
+  // Matrimonio attivo per la vista ospite
+  const activeGuestWedding = weddings.find(
+    w => w.weddingCode.toUpperCase() === (currentGuest?.weddingCode.toUpperCase() || 'EMMA-ALEX-2026')
+  ) || weddings[0];
 
   const handleCopyServerJs = () => {
+    const serverJsFile = PROJECT_FILES.find(f => f.id === 'server-js');
     if (serverJsFile) {
       navigator.clipboard.writeText(serverJsFile.content);
       setCopiedServerJs(true);
-      setTimeout(() => setCopiedServerJs(false), 2200);
+      setTimeout(() => setCopiedServerJs(false), 2000);
     }
   };
 
   const handleDownloadAll = () => {
-    // Genera un manifest riepilogativo di tutti i file creati
     const fullProjectText = `=== PROGETTO WEDDING GUEST CONCIERGE (EXPRESS + PRISMA) ===\n\n` +
       `STRUTTURA CARTELLE:\n${DIRECTORY_TREE}\n\n` +
       PROJECT_FILES.map(f => `\n=========================================\nFILE: ${f.path}\nDESCRIZIONE: ${f.description}\n=========================================\n${f.content}\n`).join('\n');
@@ -49,13 +105,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-100/60 text-neutral-900 flex flex-col selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-neutral-100/70 text-neutral-900 flex flex-col selection:bg-neutral-900 selection:text-white">
       {/* 
         ======================================================================
         TOP BAR CONTRACT (Strict 3-Zone Architecture)
         Zone 1: Wordmark brand element
-        Zone 2: Clean text navigation links with subtle hover underlines
-        Zone 3: Primary action button
+        Zone 2: Clean text navigation links
+        Zone 3: User authentication status & quick action
         ======================================================================
       */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-neutral-200">
@@ -63,8 +119,8 @@ export default function App() {
           {/* Zone 1: Brand Wordmark */}
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setCurrentView('architecture')}
-              className="text-left group"
+              onClick={() => setCurrentView('home')}
+              className="text-left group flex items-center gap-2"
             >
               <span className="text-xl font-serif-luxury font-bold tracking-tight text-neutral-900 group-hover:text-amber-800 transition-colors">
                 Riviera Wedding Concierge
@@ -73,106 +129,206 @@ export default function App() {
           </div>
 
           {/* Zone 2: Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-neutral-600">
+          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-neutral-600">
+            <button
+              onClick={() => setCurrentView('home')}
+              className={`transition-colors py-1 ${
+                currentView === 'home'
+                  ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
+                  : 'hover:text-neutral-900'
+              }`}
+            >
+              Home & Login
+            </button>
+
+            {/* Link Ospite (Attivo se loggato come ospite) */}
+            {authRole === 'guest' && (
+              <button
+                onClick={() => setCurrentView('guest')}
+                className={`transition-colors py-1 ${
+                  currentView === 'guest'
+                    ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
+                    : 'hover:text-neutral-900'
+                }`}
+              >
+                Mio Matrimonio ({currentGuest?.weddingCode})
+              </button>
+            )}
+
+            {/* Link Amministrazione (Attivo se loggato come admin) */}
+            {authRole === 'admin' && (
+              <>
+                <button
+                  onClick={() => setCurrentView('admin')}
+                  className={`transition-colors py-1 ${
+                    currentView === 'admin'
+                      ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
+                      : 'hover:text-neutral-900'
+                  }`}
+                >
+                  Pannello Agenzia & Inviti
+                </button>
+
+                <button
+                  onClick={() => setCurrentView('dashboard')}
+                  className={`transition-colors py-1 ${
+                    currentView === 'dashboard'
+                      ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
+                      : 'hover:text-neutral-900'
+                  }`}
+                >
+                  Monitoraggio Camere & Voli
+                </button>
+              </>
+            )}
+
             <button
               onClick={() => setCurrentView('architecture')}
-              className={`transition-colors py-1 relative ${
+              className={`transition-colors py-1 ${
                 currentView === 'architecture'
                   ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
                   : 'hover:text-neutral-900'
               }`}
             >
-              Architettura & File Node.js
-            </button>
-
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`transition-colors py-1 relative ${
-                currentView === 'dashboard'
-                  ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
-                  : 'hover:text-neutral-900'
-              }`}
-            >
-              Dashboard Agenzia
-            </button>
-
-            <button
-              onClick={() => setCurrentView('guest')}
-              className={`transition-colors py-1 relative ${
-                currentView === 'guest'
-                  ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
-                  : 'hover:text-neutral-900'
-              }`}
-            >
-              Portale Ospite Estero
+              Architettura Express & Prisma
             </button>
 
             <button
               onClick={() => setCurrentView('api')}
-              className={`transition-colors py-1 relative ${
+              className={`transition-colors py-1 ${
                 currentView === 'api'
                   ? 'text-neutral-900 font-bold border-b-2 border-neutral-900'
                   : 'hover:text-neutral-900'
               }`}
             >
-              Collaudo API Express
+              Test API REST
             </button>
           </nav>
 
-          {/* Zone 3: Primary Actions */}
+          {/* Zone 3: Authentication Badges & Actions */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopyServerJs}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors whitespace-nowrap"
-            >
-              {copiedServerJs ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedServerJs ? 'server.js Copiato!' : 'Copia server.js'}</span>
-            </button>
+            {authRole === 'guest' && currentGuest ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-neutral-800 bg-neutral-100 rounded-md">
+                  <Globe className="w-3.5 h-3.5 text-neutral-500" />
+                  <span className="truncate max-w-[120px]">{currentGuest.name}</span>
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 text-xs text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                >
+                  Esci
+                </button>
+              </div>
+            ) : authRole === 'admin' ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-rose-800 bg-rose-50 rounded-md border border-rose-200">
+                  <Lock className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Admin Agenzia</span>
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 text-xs text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
+                >
+                  Esci
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCurrentView('home')}
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors"
+              >
+                Accedi
+              </button>
+            )}
 
             <button
               onClick={handleDownloadAll}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-md transition-colors whitespace-nowrap shadow-xs"
+              className="hidden lg:flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Esporta Progetto</span>
+              <span>Esporta Zip</span>
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Strip */}
-        <div className="md:hidden flex items-center justify-around border-t border-neutral-100 bg-white px-2 py-2 text-[11px] font-medium text-neutral-600">
+        {/* Mobile Submenu Bar */}
+        <div className="md:hidden flex items-center justify-around border-t border-neutral-100 bg-white px-2 py-2 text-[11px] font-medium text-neutral-600 overflow-x-auto">
+          <button
+            onClick={() => setCurrentView('home')}
+            className={`px-2 py-1 rounded whitespace-nowrap ${currentView === 'home' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+          >
+            Home / Login
+          </button>
+
+          {authRole === 'guest' && (
+            <button
+              onClick={() => setCurrentView('guest')}
+              className={`px-2 py-1 rounded whitespace-nowrap ${currentView === 'guest' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+            >
+              Mio Matrimonio
+            </button>
+          )}
+
+          {authRole === 'admin' && (
+            <button
+              onClick={() => setCurrentView('admin')}
+              className={`px-2 py-1 rounded whitespace-nowrap ${currentView === 'admin' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+            >
+              Pannello Agenzia
+            </button>
+          )}
+
           <button
             onClick={() => setCurrentView('architecture')}
-            className={`px-2 py-1 rounded ${currentView === 'architecture' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+            className={`px-2 py-1 rounded whitespace-nowrap ${currentView === 'architecture' ? 'bg-neutral-900 text-white font-bold' : ''}`}
           >
-            Architettura
+            Architettura File
           </button>
-          <button
-            onClick={() => setCurrentView('dashboard')}
-            className={`px-2 py-1 rounded ${currentView === 'dashboard' ? 'bg-neutral-900 text-white font-bold' : ''}`}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => setCurrentView('guest')}
-            className={`px-2 py-1 rounded ${currentView === 'guest' ? 'bg-neutral-900 text-white font-bold' : ''}`}
-          >
-            Portale Ospiti
-          </button>
+
           <button
             onClick={() => setCurrentView('api')}
-            className={`px-2 py-1 rounded ${currentView === 'api' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+            className={`px-2 py-1 rounded whitespace-nowrap ${currentView === 'api' ? 'bg-neutral-900 text-white font-bold' : ''}`}
           >
-            API Test
+            Test API
           </button>
         </div>
       </header>
 
       {/* Main Viewport Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentView === 'architecture' && <ProjectExplorer />}
+        {currentView === 'home' && (
+          <HomeLogin 
+            weddings={weddings} 
+            onGuestLogin={handleGuestLogin} 
+            onAdminLogin={handleAdminLogin} 
+          />
+        )}
+
+        {currentView === 'guest' && (
+          <GuestPortal 
+            weddingData={activeGuestWedding} 
+            guestInfo={currentGuest || {
+              name: 'Eleanor Vance',
+              email: 'eleanor.vance@example.com',
+              weddingCode: activeGuestWedding.weddingCode,
+              provider: 'google'
+            }}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {currentView === 'admin' && (
+          <AdminPanel 
+            weddings={weddings} 
+            onUpdateWeddings={setWeddings}
+            onLogout={handleLogout}
+            onPreviewAsGuest={handlePreviewAsGuest}
+          />
+        )}
+
         {currentView === 'dashboard' && <AgencyDashboard />}
-        {currentView === 'guest' && <GuestPortal />}
+        {currentView === 'architecture' && <ProjectExplorer />}
         {currentView === 'api' && <ApiPlayground />}
       </main>
 
@@ -182,15 +338,15 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="font-serif-luxury font-bold text-neutral-800 text-sm">Riviera Wedding Concierge</span>
             <span aria-hidden="true">·</span>
-            <span>Node.js / Express / Prisma ORM Architecture</span>
+            <span>Gestione Ospiti Esteri, Hotel Room Blocks & NCC</span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
-            <span>Hotel Room Blocks</span>
+            <span>Accesso Ospite con Google & Apple</span>
             <span aria-hidden="true">·</span>
-            <span>Airport Transfers & NCC</span>
+            <span>Inviti WhatsApp Automatici</span>
             <span aria-hidden="true">·</span>
-            <span>Curated Guest Experiences</span>
+            <span>Node.js / Express / Prisma</span>
           </div>
         </div>
       </footer>
