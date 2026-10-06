@@ -1,0 +1,253 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // o "sqlite" per test locali
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// Modello: Matrimonio (Destination Wedding)
+// ---------------------------------------------------------
+model Wedding {
+  id              String      @id @default(uuid())
+  weddingCode     String      @unique // Es. "EMMA-ALEX-2026" per il login dell'ospite
+  coupleNames     String      // Es. "Emma Watson & Alexander Sterling"
+  weddingDate     DateTime
+  locationName    String      // Es. "Villa Balbianello, Lago di Como"
+  city            String      // Es. "Tremezzina / Lenno"
+  country         String      @default("Italy")
+  bannerImage     String?
+  welcomeMessage  String?
+  currency        String      @default("EUR")
+  conciergeEmail  String      @default("concierge@rivieraweddings.com")
+  conciergePhone  String      @default("+39 031 998877")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relazioni
+  guests          Guest[]
+  hotels          Hotel[]
+  transfers       Transfer[]
+  experiences     Experience[]
+}
+
+// ---------------------------------------------------------
+// Modello: Ospite Estero
+// ---------------------------------------------------------
+model Guest {
+  id              String      @id @default(uuid())
+  weddingId       String
+  wedding         Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  nationality     String?     // Es. "United States", "United Kingdom"
+  primaryLanguage String      @default("en") // "en", "it", "fr", "de", "es"
+  
+  // RSVP & Preferenze
+  rsvpStatus      RsvpStatus  @default(PENDING) // PENDING, CONFIRMED, DECLINED
+  plusOneAllowed  Boolean     @default(false)
+  plusOneName     String?
+  dietaryNotes    String?     // Es. "Vegetarian, gluten free, allergic to nuts"
+  specialNotes    String?     // Assistenza mobilità, seggiolini bambini
+
+  // Informazioni di Viaggio
+  arrivalAirport  String?     // Es. "MXP - Milano Malpensa"
+  arrivalFlight   String?     // Es. "BA 562"
+  arrivalDateTime DateTime?
+  departureFlight String?
+  departureDateTime DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Prenotazioni collegate
+  roomBookings        RoomBooking[]
+  transferBookings    TransferBooking[]
+  experienceBookings  ExperienceBooking[]
+
+  @@unique([weddingId, email])
+}
+
+enum RsvpStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+// ---------------------------------------------------------
+// Modello: Hotel Convenzionato & Blocchi Camere
+// ---------------------------------------------------------
+model Hotel {
+  id              String      @id @default(uuid())
+  weddingId       String
+  wedding         Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  
+  name            String      // Es. "Grand Hotel Tremezzo"
+  stars           Int         @default(5)
+  address         String
+  website         String?
+  distanceToVenue String      // Es. "10 minuti con navetta o boat taxi"
+  bookingDeadline DateTime?   // Data limite per bloccare la tariffa accordata
+  
+  // Condizioni contrattuali
+  groupCode       String?     // Codice sconto per prenotazione diretta
+  currency        String      @default("EUR")
+  contactPhone    String?
+  contactEmail    String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  roomTypes       RoomType[]
+}
+
+model RoomType {
+  id              String      @id @default(uuid())
+  hotelId         String
+  hotel           Hotel       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  name            String      // Es. "Deluxe Lake View", "Classic Garden"
+  description     String?
+  pricePerNight   Decimal     // Prezzo concordato con l'agenzia
+  maxOccupancy    Int         @default(2)
+  totalBlocked    Int         // Numero camere opzionate con l'hotel
+  availableRooms  Int         // Camere rimanenti
+
+  bookings        RoomBooking[]
+}
+
+model RoomBooking {
+  id              String      @id @default(uuid())
+  guestId         String
+  guest           Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  roomTypeId      String
+  roomType        RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  guestsCount     Int         @default(2)
+  totalCost       Decimal?
+  status          BookingStatus @default(CONFIRMED)
+  specialRequests String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// ---------------------------------------------------------
+// Modello: Trasferimenti (Shuttle, NCC, Navette)
+// ---------------------------------------------------------
+model Transfer {
+  id              String      @id @default(uuid())
+  weddingId       String
+  wedding         Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+
+  type            TransferType // AIRPORT_SHUTTLE, PRIVATE_NCC, VENUE_SHUTTLE
+  title           String       // Es. "Shuttle Malpensa T1 -> Tremezzo"
+  origin          String       // Es. "Aeroporto MXP"
+  destination     String       // Es. "Hotel convenzionati"
+  departureDate   DateTime?
+  departureTime   String?      // Es. "11:30" o "Flessibile su arrivo volo"
+  
+  vehicleType     String       // Es. "Mercedes Sprinter Luxury 16 pax"
+  capacity        Int          @default(8)
+  pricePerSeat    Decimal      @default(0.0) // 0 se pagato dagli sposi
+  isPaidByCouple  Boolean      @default(false)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  bookings        TransferBooking[]
+}
+
+enum TransferType {
+  AIRPORT_SHUTTLE
+  PRIVATE_NCC
+  VENUE_SHUTTLE
+  WATER_TAXI
+}
+
+model TransferBooking {
+  id              String      @id @default(uuid())
+  guestId         String
+  guest           Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  transferId      String
+  transfer        Transfer    @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  seatsCount      Int         @default(1)
+  luggageCount    Int         @default(2)
+  flightNumber    String?
+  flightArrival   DateTime?
+  pickupNotes     String?
+  status          BookingStatus @default(CONFIRMED)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// ---------------------------------------------------------
+// Modello: Esperienze & Attività Turistiche
+// ---------------------------------------------------------
+model Experience {
+  id              String      @id @default(uuid())
+  weddingId       String
+  wedding         Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+
+  title           String       // Es. "Sunset Boat Cruise su Motoscafo Riva"
+  category        ExpCategory  // BOAT_TOUR, WINE_TASTING, COOKING_CLASS, WELCOME_PARTY, BRUNCH
+  description     String
+  eventDate       DateTime
+  startTime       String       // Es. "18:00"
+  durationHours   Decimal      @default(2.5)
+  meetingPoint    String       // Es. "Pontile Tremezzo"
+  
+  pricePerPerson  Decimal      @default(0.0) // 0 se offerta dagli sposi
+  isHostSponsored Boolean      @default(false)
+  maxParticipants Int          @default(20)
+  dressCode       String?      // Es. "Smart Casual / White Attire"
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  bookings        ExperienceBooking[]
+}
+
+enum ExpCategory {
+  BOAT_TOUR
+  WINE_TASTING
+  COOKING_CLASS
+  WELCOME_PARTY
+  FAREWELL_BRUNCH
+  CITY_TOUR
+}
+
+model ExperienceBooking {
+  id              String      @id @default(uuid())
+  guestId         String
+  guest           Guest       @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  experienceId    String
+  experience      Experience  @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  participantsCount Int       @default(1)
+  dietaryNeeds    String?
+  notes           String?
+  status          BookingStatus @default(CONFIRMED)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  WAITLIST
+}

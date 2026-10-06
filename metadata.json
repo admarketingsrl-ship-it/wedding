@@ -1,0 +1,7 @@
+{
+  "name": "Wedding Concierge - Express & Node.js Architettura",
+  "description": "Struttura cartelle, package.json, schema Prisma e server Express per agenzia di gestione ospiti esteri di matrimoni con demo interattiva.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

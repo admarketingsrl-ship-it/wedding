@@ -1,0 +1,40 @@
+{
+  "name": "wedding-guest-concierge-backend",
+  "version": "1.0.0",
+  "description": "API backend Express e Prisma per agenzia di gestione ospiti esteri di matrimoni (hotel, transfer, esperienze)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js",
+    "test": "echo \"Error: no test specified\" && exit 0"
+  },
+  "keywords": [
+    "wedding-concierge",
+    "destination-wedding",
+    "hospitality",
+    "express",
+    "prisma",
+    "cors",
+    "guest-management"
+  ],
+  "author": "Wedding Hospitality Agency",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "@prisma/client": "^6.4.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "prisma": "^6.4.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
