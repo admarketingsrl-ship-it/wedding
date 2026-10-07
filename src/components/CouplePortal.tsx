@@ -30,7 +30,10 @@ import {
   Gift,
   Compass,
   Check,
-  X
+  X,
+  Pencil,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { 
   WeddingData, 
@@ -146,6 +149,13 @@ export default function CouplePortal({
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
   const [newScheduleLocation, setNewScheduleLocation] = useState('');
   const [newScheduleDesc, setNewScheduleDesc] = useState('');
+
+  // Stato Modifica Elemento Esistente Timeline
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editScheduleTime, setEditScheduleTime] = useState('');
+  const [editScheduleTitle, setEditScheduleTitle] = useState('');
+  const [editScheduleLocation, setEditScheduleLocation] = useState('');
+  const [editScheduleDesc, setEditScheduleDesc] = useState('');
 
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
@@ -324,12 +334,75 @@ export default function CouplePortal({
   const handleDeleteScheduleEvent = (id: string) => {
     const updated = schedule.filter(s => s.id !== id);
     setSchedule(updated);
+    if (editingScheduleId === id) {
+      setEditingScheduleId(null);
+    }
     const updatedWedding: WeddingData = {
       ...weddingData,
       schedule: updated
     };
     onUpdateWedding(updatedWedding);
     triggerToast('Momento rimosso dal programma.');
+  };
+
+  // Inizio Modifica Momento Programma
+  const handleStartEditSchedule = (item: ScheduleEvent) => {
+    setEditingScheduleId(item.id);
+    setEditScheduleTime(item.time);
+    setEditScheduleTitle(item.title);
+    setEditScheduleLocation(item.location || '');
+    setEditScheduleDesc(item.description || '');
+  };
+
+  // Salva Modifica Momento Programma
+  const handleSaveEditSchedule = () => {
+    if (!editingScheduleId || !editScheduleTime.trim() || !editScheduleTitle.trim()) return;
+    const updated = schedule.map(s => {
+      if (s.id === editingScheduleId) {
+        return {
+          ...s,
+          time: editScheduleTime.trim(),
+          title: editScheduleTitle.trim(),
+          location: editScheduleLocation.trim() || venue,
+          description: editScheduleDesc.trim()
+        };
+      }
+      return s;
+    });
+    setSchedule(updated);
+    setEditingScheduleId(null);
+
+    const updatedWedding: WeddingData = {
+      ...weddingData,
+      schedule: updated
+    };
+    onUpdateWedding(updatedWedding);
+    triggerToast('Momento del programma modificato e salvato!');
+  };
+
+  // Annulla Modifica Momento Programma
+  const handleCancelEditSchedule = () => {
+    setEditingScheduleId(null);
+    setEditScheduleTime('');
+    setEditScheduleTitle('');
+    setEditScheduleLocation('');
+    setEditScheduleDesc('');
+  };
+
+  // Sposta Ordine Cronologico Momenti
+  const handleMoveSchedule = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= schedule.length) return;
+    const newSched = [...schedule];
+    const [removed] = newSched.splice(index, 1);
+    newSched.splice(targetIndex, 0, removed);
+    setSchedule(newSched);
+    const updatedWedding: WeddingData = {
+      ...weddingData,
+      schedule: newSched
+    };
+    onUpdateWedding(updatedWedding);
+    triggerToast('Ordine del programma aggiornato!');
   };
 
   // Secondary info management
@@ -750,41 +823,162 @@ ${coupleNames} ❤️`;
 
             {/* Lista Momenti Timeline */}
             <div className="space-y-3">
-              {schedule.map((item, idx) => (
-                <div 
-                  key={item.id}
-                  className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-100/70 transition-colors"
-                >
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-16 px-2 py-1 rounded-lg bg-neutral-900 text-white text-center font-mono text-xs font-bold shrink-0">
-                      {item.time}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-neutral-900 flex items-center gap-2">
-                        <span>{item.title}</span>
-                        <span className="text-[11px] font-normal text-neutral-500">📍 {item.location}</span>
+              {schedule.map((item, idx) => {
+                const isEditing = editingScheduleId === item.id;
+
+                if (isEditing) {
+                  return (
+                    <div 
+                      key={item.id}
+                      className="p-4 bg-amber-50/60 rounded-xl border-2 border-amber-300 shadow-sm space-y-3 animate-in fade-in duration-200"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-200/70">
+                        <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                          <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Modifica Momento del Programma</span>
+                        </span>
+                        <span className="text-[11px] text-amber-800/80 font-mono">
+                          #{idx + 1}
+                        </span>
                       </div>
-                      {item.description && (
-                        <div className="text-[11px] text-neutral-600 mt-0.5">{item.description}</div>
-                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">Orario</label>
+                          <input
+                            type="text"
+                            value={editScheduleTime}
+                            onChange={(e) => setEditScheduleTime(e.target.value)}
+                            placeholder="17:30"
+                            className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg font-mono font-bold text-neutral-900 focus:outline-hidden focus:ring-2 focus:ring-amber-700"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">Momento / Titolo</label>
+                          <input
+                            type="text"
+                            value={editScheduleTitle}
+                            onChange={(e) => setEditScheduleTitle(e.target.value)}
+                            placeholder="Es. Cerimonia nell'Uliveto"
+                            className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg font-semibold text-neutral-900 focus:outline-hidden focus:ring-2 focus:ring-amber-700"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">Luogo / Punto d'incontro</label>
+                          <input
+                            type="text"
+                            value={editScheduleLocation}
+                            onChange={(e) => setEditScheduleLocation(e.target.value)}
+                            placeholder="Es. Borgo Egnazia, Uliveto"
+                            className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg text-neutral-900 focus:outline-hidden focus:ring-2 focus:ring-amber-700"
+                          />
+                        </div>
+                        <div className="sm:col-span-12">
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">Dettagli & Note per gli ospiti (opzionale)</label>
+                          <input
+                            type="text"
+                            value={editScheduleDesc}
+                            onChange={(e) => setEditScheduleDesc(e.target.value)}
+                            placeholder="Es. Calice di benvenuto, musica d'arpa e rinfresco per gli ospiti"
+                            className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-hidden focus:ring-2 focus:ring-amber-700"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200/70">
+                        <button
+                          type="button"
+                          onClick={handleCancelEditSchedule}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Annulla</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveEditSchedule}
+                          className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Salva Modifiche</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={item.id}
+                    className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-100/70 transition-colors group"
+                  >
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="w-16 px-2 py-1.5 rounded-lg bg-neutral-900 text-white text-center font-mono text-xs font-bold shrink-0 shadow-2xs">
+                        {item.time}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-neutral-900 flex items-center gap-2 flex-wrap">
+                          <span>{item.title}</span>
+                          <span className="text-[11px] font-normal text-neutral-500">📍 {item.location}</span>
+                        </div>
+                        {item.description && (
+                          <div className="text-[11px] text-neutral-600 mt-0.5 leading-snug">{item.description}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                      {/* Pulsanti per riordinare cronologicamente */}
+                      <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveSchedule(idx, 'up')}
+                          className={`p-1 rounded text-neutral-500 hover:text-neutral-900 ${idx === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:bg-neutral-100 cursor-pointer'}`}
+                          title="Sposta prima"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === schedule.length - 1}
+                          onClick={() => handleMoveSchedule(idx, 'down')}
+                          className={`p-1 rounded text-neutral-500 hover:text-neutral-900 ${idx === schedule.length - 1 ? 'opacity-25 cursor-not-allowed' : 'hover:bg-neutral-100 cursor-pointer'}`}
+                          title="Sposta dopo"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Pulsante Modifica */}
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditSchedule(item)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-neutral-800 bg-white hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300 border border-neutral-200 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        title="Modifica questo momento"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Modifica</span>
+                      </button>
+
+                      {/* Pulsante Elimina */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteScheduleEvent(item.id)}
+                        className="p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
+                        title="Rimuovi momento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteScheduleEvent(item.id)}
-                    className="self-end sm:self-center p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
-                    title="Rimuovi momento"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Aggiunta Nuovo Momento */}
-            <div className="pt-4 border-t border-neutral-100">
-              <span className="text-xs font-bold text-neutral-800 block mb-3">
+            <div className="pt-4 border-t border-neutral-100 space-y-3">
+              <span className="text-xs font-bold text-neutral-800 block">
                 Aggiungi un Nuovo Momento al Programma:
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -795,7 +989,7 @@ ${coupleNames} ❤️`;
                     value={newScheduleTime}
                     onChange={(e) => setNewScheduleTime(e.target.value)}
                     placeholder="17:30"
-                    className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg font-mono"
+                    className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg font-mono font-bold"
                   />
                 </div>
                 <div className="sm:col-span-4">
@@ -805,7 +999,7 @@ ${coupleNames} ❤️`;
                     value={newScheduleTitle}
                     onChange={(e) => setNewScheduleTitle(e.target.value)}
                     placeholder="Es. Cerimonia nell'Uliveto"
-                    className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg"
+                    className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg font-semibold"
                   />
                 </div>
                 <div className="sm:col-span-3">
@@ -827,6 +1021,16 @@ ${coupleNames} ❤️`;
                     <Plus className="w-3.5 h-3.5" />
                     <span>Aggiungi al Programma</span>
                   </button>
+                </div>
+                <div className="sm:col-span-12">
+                  <label className="block text-[11px] font-medium text-neutral-600 mb-1">Dettagli & Descrizione per gli invitati (opzionale)</label>
+                  <input
+                    type="text"
+                    value={newScheduleDesc}
+                    onChange={(e) => setNewScheduleDesc(e.target.value)}
+                    placeholder="Es. Rinfresco all'arrivo con bevande fresche, musica acustica e ventagli"
+                    className="w-full p-2 text-xs bg-white border border-neutral-300 rounded-lg text-neutral-800"
+                  />
                 </div>
               </div>
             </div>

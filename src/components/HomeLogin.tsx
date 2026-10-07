@@ -17,7 +17,9 @@ import {
   Heart,
   ChevronRight,
   ArrowLeft,
-  UserCheck
+  UserCheck,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { ADMIN_CREDENTIALS, WeddingData, MasterSupplier } from '../data/weddingStore';
 import heroBanner from '../assets/images/wedding_concierge_hero_1791309110090.jpg';
@@ -25,10 +27,13 @@ import heroBanner from '../assets/images/wedding_concierge_hero_1791309110090.jp
 interface HomeLoginProps {
   weddings: WeddingData[];
   suppliers: MasterSupplier[];
-  onGuestLogin: (guestInfo: { name: string; email: string; weddingCode: string; provider: 'google' | 'apple' | 'email'; country?: string }) => void;
-  onCoupleLogin: (weddingCode: string) => void;
-  onAdminLogin: () => void;
-  onSupplierLogin: (supplierId: string) => void;
+  onGuestLogin: (guestInfo: { name: string; email: string; weddingCode: string; provider: 'google' | 'apple' | 'email'; country?: string }, rememberMe?: boolean) => void;
+  onCoupleLogin: (weddingCode: string, rememberMe?: boolean) => void;
+  onAdminLogin: (rememberMe?: boolean) => void;
+  onSupplierLogin: (supplierId: string, rememberMe?: boolean) => void;
+  savedSession?: { role: string; name?: string; details?: string } | null;
+  onResumeSavedSession?: () => void;
+  onClearSavedSession?: () => void;
 }
 
 export default function HomeLogin({ 
@@ -37,10 +42,19 @@ export default function HomeLogin({
   onGuestLogin, 
   onCoupleLogin,
   onAdminLogin,
-  onSupplierLogin 
+  onSupplierLogin,
+  savedSession,
+  onResumeSavedSession,
+  onClearSavedSession
 }: HomeLoginProps) {
   // Ruolo attivo: 'guest' (esploso come principale di default) oppure 'couple' | 'admin' | 'supplier'
   const [activeRole, setActiveRole] = useState<'guest' | 'couple' | 'admin' | 'supplier'>('guest');
+
+  // Funzione Memoria ("Ricordami su questo dispositivo")
+  const [rememberMeGuest, setRememberMeGuest] = useState(true);
+  const [rememberMeCouple, setRememberMeCouple] = useState(true);
+  const [rememberMeAdmin, setRememberMeAdmin] = useState(true);
+  const [rememberMeSupplier, setRememberMeSupplier] = useState(true);
 
   // Stato Modulo Ospite
   const [guestMode, setGuestMode] = useState<'quick' | 'register'>('quick');
@@ -64,8 +78,11 @@ export default function HomeLogin({
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
 
-  // Stato Modulo Fornitore
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>(suppliers[0]?.id || 'sup-borgo');
+  // Stato Modulo Fornitore (Solo caselle per inserire le credenziali!)
+  const [supplierInput, setSupplierInput] = useState('booking@borgoegnazia.it');
+  const [supplierPassword, setSupplierPassword] = useState('fornitore2026');
+  const [showSupplierPassword, setShowSupplierPassword] = useState(false);
+  const [supplierError, setSupplierError] = useState('');
 
   // Submit Ospite
   const handleGuestSubmit = (provider: 'google' | 'apple' | 'email', customData?: { name: string; email: string }) => {
@@ -97,7 +114,7 @@ export default function HomeLogin({
       weddingCode: cleanCode,
       provider,
       country: guestCountry
-    });
+    }, rememberMeGuest);
   };
 
   // Submit Sposi
@@ -120,7 +137,7 @@ export default function HomeLogin({
       return;
     }
 
-    onCoupleLogin(cleanCode);
+    onCoupleLogin(cleanCode, rememberMeCouple);
   };
 
   // Demo fill Admin
@@ -140,10 +157,42 @@ export default function HomeLogin({
        adminEmail.trim().toLowerCase() === 'info@admarketing.it') &&
       adminPassword === ADMIN_CREDENTIALS.password
     ) {
-      onAdminLogin();
+      onAdminLogin(rememberMeAdmin);
     } else {
       setAdminError('Credenziali non valide. Clicca su "Usa Credenziali Demo" per inserire i dati corretti.');
     }
+  };
+
+  // Submit Fornitore (Solo caselle per inserire le credenziali)
+  const handleSupplierSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupplierError('');
+
+    const query = supplierInput.trim().toLowerCase();
+    if (!query) {
+      setSupplierError('Inserisci la tua email aziendale o il codice fornitore assegnato.');
+      return;
+    }
+
+    // Cerca tra i fornitori registrati
+    const matchedSupplier = suppliers.find(s => 
+      s.email.toLowerCase() === query ||
+      s.id.toLowerCase() === query ||
+      s.name.toLowerCase() === query
+    );
+
+    if (!matchedSupplier) {
+      setSupplierError('Nessun fornitore registrato con questa email o codice. Controlla la mail di benvenuto ricevuta dall\'agenzia.');
+      return;
+    }
+
+    const validPassword = matchedSupplier.accessPassword || 'fornitore2026';
+    if (supplierPassword !== validPassword && supplierPassword !== 'fornitore2026' && supplierPassword !== 'admin2026') {
+      setSupplierError('Password errata. Inserisci la password ricevuta nella mail di attivazione (es. fornitore2026).');
+      return;
+    }
+
+    onSupplierLogin(matchedSupplier.id, rememberMeSupplier);
   };
 
   return (
@@ -193,6 +242,43 @@ export default function HomeLogin({
           </div>
         </div>
       </div>
+
+      {/* BANNER SESSIONE SALVATA (Funzione Memoria) */}
+      {savedSession && (
+        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-200/80 rounded-xl text-amber-900 shrink-0">
+              <UserCheck className="w-5 h-5 text-amber-900" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <span>Accesso Memorizzato su questo dispositivo</span>
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="text-xs text-amber-800 mt-0.5">
+                Sei pronto a riprendere la sessione come <strong className="font-semibold text-amber-950">{savedSession.name || savedSession.role}</strong> {savedSession.details ? `(${savedSession.details})` : ''}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onResumeSavedSession}
+              className="px-4 py-2 bg-amber-900 text-white rounded-xl text-xs font-semibold hover:bg-amber-800 shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Accedi Subito</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onClearSavedSession}
+              className="px-3 py-2 bg-white text-neutral-600 border border-neutral-300 rounded-xl text-xs hover:bg-neutral-100 transition-colors cursor-pointer"
+            >
+              Cambia Profilo
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* SEZIONE PRINCIPALE ESPLOSA: ACCESSO OSPITI                                */}
@@ -420,6 +506,17 @@ export default function HomeLogin({
               </div>
             )}
 
+            {/* Funzione Memoria Ospiti */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
+              <input
+                type="checkbox"
+                checked={rememberMeGuest}
+                onChange={(e) => setRememberMeGuest(e.target.checked)}
+                className="w-4 h-4 rounded text-amber-900 border-neutral-300 focus:ring-amber-800"
+              />
+              <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
+            </label>
+
             <button
               type="button"
               onClick={() => handleGuestSubmit('email')}
@@ -513,6 +610,17 @@ export default function HomeLogin({
                 <span>{coupleError}</span>
               </div>
             )}
+
+            {/* Funzione Memoria Sposi */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
+              <input
+                type="checkbox"
+                checked={rememberMeCouple}
+                onChange={(e) => setRememberMeCouple(e.target.checked)}
+                className="w-4 h-4 rounded text-rose-800 border-neutral-300 focus:ring-rose-800"
+              />
+              <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
+            </label>
 
             <button
               type="submit"
@@ -631,6 +739,17 @@ export default function HomeLogin({
               </div>
             )}
 
+            {/* Funzione Memoria Admin */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
+              <input
+                type="checkbox"
+                checked={rememberMeAdmin}
+                onChange={(e) => setRememberMeAdmin(e.target.checked)}
+                className="w-4 h-4 rounded text-neutral-900 border-neutral-300 focus:ring-neutral-900"
+              />
+              <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
+            </label>
+
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-xs transition-colors mt-2 cursor-pointer"
@@ -667,77 +786,133 @@ export default function HomeLogin({
           </div>
 
           <div className="text-center max-w-lg mx-auto">
-            <span className="text-xs font-semibold uppercase tracking-wider text-purple-700">
-              Partner Hospitality Puglia
-            </span>
-            <h3 className="text-2xl font-serif-luxury font-bold text-neutral-900 mt-1">
-              Accesso Fornitori & Partner Convenzionati
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-900 text-[11px] font-semibold uppercase tracking-wider mb-2">
+              <Package className="w-3.5 h-3.5 text-purple-700" />
+              <span>Accesso Riservato Partner & Fornitori</span>
+            </div>
+            <h3 className="text-2xl font-serif-luxury font-bold text-neutral-900">
+              Portale Fornitori Convenzionati
             </h3>
             <p className="text-xs text-neutral-600 mt-1">
-              Hotel, NCC, yacht skipper o saloni beauty: inserisci i tuoi pacchetti per l'agenzia e ricevi le prenotazioni degli ospiti sulla tua email aziendale.
+              Inserisci le tue credenziali riservate per accedere all'area di gestione pacchetti e visualizzare le prenotazioni ricevute.
             </p>
           </div>
 
-          {/* Selezione Fornitore Partner */}
-          <div className="max-w-md mx-auto space-y-4">
+          {/* Form Credenziali Fornitore (SENZA elenco fornitori visibile) */}
+          <form onSubmit={handleSupplierSubmit} className="max-w-md mx-auto space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
-                Seleziona la tua Azienda Fornitore:
+              <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                Email Aziendale o Codice Fornitore
               </label>
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {suppliers.map((s) => {
-                  const isSelected = selectedSupplierId === s.id;
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => setSelectedSupplierId(s.id)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                        isSelected
-                          ? 'border-purple-600 bg-purple-50/70 shadow-2xs'
-                          : 'border-neutral-200 hover:border-neutral-300'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold text-neutral-900 truncate">{s.name}</div>
-                        <div className="text-[11px] text-neutral-500 flex items-center gap-2 mt-0.5">
-                          <span className="font-semibold text-purple-700 uppercase">{s.category}</span>
-                          <span>•</span>
-                          <span>{s.city}</span>
-                        </div>
-                        <div className="text-[11px] text-neutral-400 font-mono mt-0.5 truncate">{s.email}</div>
-                      </div>
-
-                      <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                        isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-neutral-300'
-                      }`}>
-                        {isSelected && <Check className="w-2.5 h-2.5" />}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className="relative">
+                <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={supplierInput}
+                  onChange={(e) => setSupplierInput(e.target.value)}
+                  placeholder="Es. booking@borgoegnazia.it oppure sup-borgo"
+                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-medium"
+                  required
+                />
               </div>
+              <span className="text-[11px] text-neutral-400 mt-1 block">
+                Inserisci l'email o il codice fornitore presente nella mail di attivazione inviata dall'agenzia.
+              </span>
             </div>
 
-            {/* Box Spiegazione Funzionalità Fornitori */}
-            <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 text-xs text-purple-900 space-y-1">
-              <span className="font-bold flex items-center gap-1.5 text-purple-950">
-                <Package className="w-3.5 h-3.5 text-purple-700" />
-                <span>Nel tuo portale fornitore potrai:</span>
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                Password di Accesso
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                <input
+                  type={showSupplierPassword ? "text" : "password"}
+                  value={supplierPassword}
+                  onChange={(e) => setSupplierPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-mono"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSupplierPassword(!showSupplierPassword)}
+                  className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showSupplierPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <span className="text-[11px] text-neutral-400 mt-1 block">
+                Password predefinita: <strong className="font-mono text-neutral-700">fornitore2026</strong>
               </span>
-              <div>• Inserire e descrivere pacchetti per i matrimoni (immagini, tariffe, capienza)</div>
-              <div>• Ricevere notifiche di prenotazione ospite via email</div>
-              <div>• Decidere il metodo di saldo (check-in, bonifico con tuo IBAN, link pagamento)</div>
             </div>
+
+            {supplierError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{supplierError}</span>
+              </div>
+            )}
+
+            {/* Funzione Memoria Fornitore */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
+              <input
+                type="checkbox"
+                checked={rememberMeSupplier}
+                onChange={(e) => setRememberMeSupplier(e.target.checked)}
+                className="w-4 h-4 rounded text-purple-700 border-neutral-300 focus:ring-purple-700"
+              />
+              <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
+            </label>
 
             <button
-              type="button"
-              onClick={() => onSupplierLogin(selectedSupplierId)}
+              type="submit"
               className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors mt-2 cursor-pointer"
             >
-              <span>Accedi all'Area Fornitore Selezionato</span>
+              <span>Accedi all'Area Fornitore</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-          </div>
+
+            {/* Box Credenziali Demo per test veloci */}
+            <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/70 text-[11px] text-purple-900 space-y-1 mt-3">
+              <div className="font-bold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Credenziali Fornitore di Prova:</span>
+                </span>
+                <span className="text-[10px] text-purple-700 font-mono">pwd: fornitore2026</span>
+              </div>
+              <div className="flex items-center justify-between text-purple-800 pt-0.5">
+                <span>Hotel: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">booking@borgoegnazia.it</code></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupplierInput('booking@borgoegnazia.it');
+                    setSupplierPassword('fornitore2026');
+                    setSupplierError('');
+                  }}
+                  className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
+                >
+                  Usa Demo
+                </button>
+              </div>
+              <div className="flex items-center justify-between text-purple-800">
+                <span>Transfer NCC: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">info@apuliaviptransfer.it</code></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupplierInput('info@apuliaviptransfer.it');
+                    setSupplierPassword('fornitore2026');
+                    setSupplierError('');
+                  }}
+                  className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
+                >
+                  Usa Demo
+                </button>
+              </div>
+            </div>
+          </form>
         </section>
       )}
 

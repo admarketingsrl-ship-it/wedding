@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Building2, 
   Compass, 
@@ -72,49 +72,186 @@ export default function App() {
   // Modali Informative Legali Footer (AD Marketing Palagianello TA)
   const [activeLegalModal, setActiveLegalModal] = useState<'privacy' | 'cookies' | 'terms' | null>(null);
 
-  // Login Ospite
-  const handleGuestLogin = (guestInfo: { 
-    name: string; 
-    email: string; 
-    weddingCode: string; 
-    provider: 'google' | 'apple' | 'email'; 
-    country?: string 
-  }) => {
+  // Storage key per memoria accessi (Funzione Memoria richiesta dall'utente)
+  const SESSION_STORAGE_KEY = 'apulian_concierge_session_v1';
+  const [savedSessionMeta, setSavedSessionMeta] = useState<{ role: string; name?: string; details?: string } | null>(null);
+
+  // Ripristino Automatico all'avvio (Ricorda l'accesso fatto ed entra automaticamente)
+  useEffect(() => {
+    try {
+      const savedRaw = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (savedRaw) {
+        const session = JSON.parse(savedRaw);
+        if (session && session.role) {
+          // Memorizza i metadati per il banner opzionale
+          setSavedSessionMeta({
+            role: session.role,
+            name: session.name || (session.guestInfo?.name) || (session.role === 'admin' ? 'Staff Valeria' : session.role),
+            details: session.details || (session.role === 'guest' ? session.guestInfo?.weddingCode : '')
+          });
+
+          // Esegui accesso automatico immediato
+          if (session.role === 'guest' && session.guestInfo) {
+            setAuthRole('guest');
+            setCurrentGuest(session.guestInfo);
+            setCurrentView('guest');
+          } else if (session.role === 'couple' && session.coupleWeddingCode) {
+            setAuthRole('couple');
+            setCurrentCoupleWeddingCode(session.coupleWeddingCode);
+            setCurrentGuest(null);
+            setCurrentView('couple');
+          } else if (session.role === 'admin') {
+            setAuthRole('admin');
+            setCurrentGuest(null);
+            setCurrentView('admin');
+          } else if (session.role === 'supplier' && session.supplierId) {
+            setAuthRole('supplier');
+            setCurrentSupplierId(session.supplierId);
+            setCurrentGuest(null);
+            setCurrentView('supplier');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Impossibile ripristinare la sessione salvata:', err);
+    }
+  }, []);
+
+  // Login Ospite con memoria
+  const handleGuestLogin = (
+    guestInfo: { 
+      name: string; 
+      email: string; 
+      weddingCode: string; 
+      provider: 'google' | 'apple' | 'email'; 
+      country?: string 
+    },
+    rememberMe: boolean = true
+  ) => {
     setAuthRole('guest');
     setCurrentGuest(guestInfo);
     setCurrentView('guest');
+
+    if (rememberMe) {
+      const session = {
+        role: 'guest',
+        guestInfo,
+        name: guestInfo.name,
+        details: `Codice Nozze: ${guestInfo.weddingCode}`,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      setSavedSessionMeta({ role: 'guest', name: guestInfo.name, details: guestInfo.weddingCode });
+    }
   };
 
-  // Login Sposi
-  const handleCoupleLogin = (code: string) => {
+  // Login Sposi con memoria
+  const handleCoupleLogin = (code: string, rememberMe: boolean = true) => {
     setAuthRole('couple');
     setCurrentCoupleWeddingCode(code);
     setCurrentGuest(null);
     setCurrentView('couple');
+
+    const coupleWed = weddings.find(w => w.weddingCode.toUpperCase() === code.toUpperCase());
+    const cNames = coupleWed?.coupleNames || code;
+
+    if (rememberMe) {
+      const session = {
+        role: 'couple',
+        coupleWeddingCode: code,
+        name: cNames,
+        details: `Area Sposi - ${code}`,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      setSavedSessionMeta({ role: 'couple', name: cNames, details: code });
+    }
   };
 
-  // Aggiornamento singolo matrimonio (dall'area sposi)
+  // Aggiornamento singolo matrimonio (dall'area sposi o admin)
   const handleUpdateSingleWedding = (updatedWedding: WeddingData) => {
     setWeddings(prev => prev.map(w => w.id === updatedWedding.id ? updatedWedding : w));
   };
 
-  // Login Amministrazione Agenzia
-  const handleAdminLogin = () => {
+  // Login Amministrazione Agenzia con memoria
+  const handleAdminLogin = (rememberMe: boolean = true) => {
     setAuthRole('admin');
     setCurrentGuest(null);
     setCurrentView('admin');
+
+    if (rememberMe) {
+      const session = {
+        role: 'admin',
+        name: 'Staff AD Marketing Concierge',
+        details: 'Back Office Direzionale',
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      setSavedSessionMeta({ role: 'admin', name: 'Staff Valeria', details: 'Back Office Agenzia' });
+    }
   };
 
-  // Login Fornitore Partner
-  const handleSupplierLogin = (supplierId: string) => {
+  // Login Fornitore Partner con memoria
+  const handleSupplierLogin = (supplierId: string, rememberMe: boolean = true) => {
     setAuthRole('supplier');
     setCurrentSupplierId(supplierId);
     setCurrentGuest(null);
     setCurrentView('supplier');
+
+    const sup = suppliers.find(s => s.id === supplierId);
+    const supName = sup?.name || supplierId;
+
+    if (rememberMe) {
+      const session = {
+        role: 'supplier',
+        supplierId,
+        name: supName,
+        details: sup ? `${sup.category} · ${sup.city}` : '',
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      setSavedSessionMeta({ role: 'supplier', name: supName, details: sup?.category });
+    }
+  };
+
+  // Riprendi sessione salvata dal banner
+  const handleResumeSavedSession = () => {
+    try {
+      const savedRaw = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (savedRaw) {
+        const session = JSON.parse(savedRaw);
+        if (session.role === 'guest' && session.guestInfo) {
+          setAuthRole('guest');
+          setCurrentGuest(session.guestInfo);
+          setCurrentView('guest');
+        } else if (session.role === 'couple' && session.coupleWeddingCode) {
+          setAuthRole('couple');
+          setCurrentCoupleWeddingCode(session.coupleWeddingCode);
+          setCurrentView('couple');
+        } else if (session.role === 'admin') {
+          setAuthRole('admin');
+          setCurrentView('admin');
+        } else if (session.role === 'supplier' && session.supplierId) {
+          setAuthRole('supplier');
+          setCurrentSupplierId(session.supplierId);
+          setCurrentView('supplier');
+        }
+      }
+    } catch (e) {
+      console.warn('Errore ripresa sessione', e);
+    }
+  };
+
+  // Cancella sessione memorizzata
+  const handleClearSavedSession = () => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setSavedSessionMeta(null);
   };
 
   // Logout Globale
   const handleLogout = () => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setSavedSessionMeta(null);
     setAuthRole(null);
     setCurrentGuest(null);
     setCurrentView('home');
@@ -454,6 +591,9 @@ export default function App() {
             onCoupleLogin={handleCoupleLogin}
             onAdminLogin={handleAdminLogin}
             onSupplierLogin={handleSupplierLogin}
+            savedSession={savedSessionMeta}
+            onResumeSavedSession={handleResumeSavedSession}
+            onClearSavedSession={handleClearSavedSession}
           />
         )}
 

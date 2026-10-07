@@ -24,6 +24,7 @@ export interface HotelItem {
   groupCode: string;
   supplierId?: string;
   image?: string;
+  negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
 }
 
 export interface TransferItem {
@@ -39,6 +40,7 @@ export interface TransferItem {
   pricePerSeat: number;
   isPaidByCouple: boolean;
   supplierId?: string;
+  negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
 }
 
 export interface ExperienceItem {
@@ -57,6 +59,7 @@ export interface ExperienceItem {
   description: string;
   supplierId?: string;
   image?: string;
+  negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
 }
 
 // Servizi aggiuntivi: Trucco, Parrucchiere, Babysitting, Stireria abiti da cerimonia
@@ -69,6 +72,7 @@ export interface ExtraServiceItem {
   duration: string;
   description: string;
   providerName: string;
+  negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
 }
 
 export interface GuestItem {
@@ -134,6 +138,28 @@ export interface MasterSupplier {
   standardRate: number;
   commissionPercent: number; // % commissione agenzia
   notes: string;
+  accessPassword?: string; // Password di accesso assegnata dall'agenzia
+  welcomeEmailSent?: boolean; // Stato invio email con credenziali e link
+  emailSentAt?: string; // Data e ora invio email con credenziali
+}
+
+// Richieste degli sposi per regalare servizi agli ospiti
+export interface CoupleGiftRequest {
+  id: string;
+  weddingCode: string;
+  coupleNames: string;
+  serviceId: string;
+  serviceTitle: string;
+  serviceCategory: 'EXPERIENCE' | 'TRANSFER' | 'EXTRA_SERVICE' | 'HOTEL';
+  guestsCount: number;
+  unitPrice: number;
+  totalEstimatedAmount: number;
+  currency: string;
+  coupleNotes?: string;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  approvedAt?: string;
+  agencyNotes?: string;
 }
 
 // Pacchetti creati dai fornitori per l'agenzia matrimoni
@@ -153,6 +179,7 @@ export interface SupplierPackage {
   includedFeatures: string[];
   image?: string;
   notesForAgency?: string;
+  negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
   createdAt: string;
 }
 
@@ -268,6 +295,7 @@ export interface WeddingData {
   experiences: ExperienceItem[];
   extraServices: ExtraServiceItem[];
   guests: GuestItem[];
+  giftRequests?: CoupleGiftRequest[];
 }
 
 export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
@@ -297,7 +325,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 080 225500',
     standardRate: 520,
     commissionPercent: 12,
-    notes: 'Partner gold per matrimoni esteri di lusso. Camere e ville private.'
+    notes: 'Partner gold per matrimoni esteri di lusso. Camere e ville private.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-10 11:30'
   },
   {
     id: 'sup-masseria-torre',
@@ -310,7 +341,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 080 4829310',
     standardRate: 460,
     commissionPercent: 15,
-    notes: 'Masseria cinquecentesca tra gli ulivi, spiaggia privata Coccaro Beach Club.'
+    notes: 'Masseria cinquecentesca tra gli ulivi, spiaggia privata Coccaro Beach Club.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-12 14:15'
   },
   {
     id: 'sup-masseria-san-domenico',
@@ -323,7 +357,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 080 4827777',
     standardRate: 490,
     commissionPercent: 12,
-    notes: 'Dimora storica fortificata del XIV secolo, talassoterapia e campo golf 18 buche.'
+    notes: 'Dimora storica fortificata del XIV secolo, talassoterapia e campo golf 18 buche.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-15 09:45'
   },
   {
     id: 'sup-ncc-puglia',
@@ -335,7 +372,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 338 9090123',
     standardRate: 45,
     commissionPercent: 20,
-    notes: 'Flotta di 8 Mercedes Sprinter VIP e 12 Classe V Luxury. Conducenti in abito con inglese fluente.'
+    notes: 'Flotta di 8 Mercedes Sprinter VIP e 12 Classe V Luxury. Conducenti in abito con inglese fluente.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-18 16:00'
   },
   {
     id: 'sup-boat-polignano',
@@ -347,7 +387,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 347 5544332',
     standardRate: 110,
     commissionPercent: 25,
-    notes: 'Barche d\'epoca in mogano e gozzi tipici per tour grotte di Polignano e calici al tramonto.'
+    notes: 'Barche d\'epoca in mogano e gozzi tipici per tour grotte di Polignano e calici al tramonto.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-20 10:20'
   },
   {
     id: 'sup-beauty-glam',
@@ -359,7 +402,10 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     phone: '+39 349 7788990',
     standardRate: 120,
     commissionPercent: 18,
-    notes: 'Staff di 6 truccatrici e acconciatori disponibili a domicilio in masseria.'
+    notes: 'Staff di 6 truccatrici e acconciatori disponibili a domicilio in masseria.',
+    accessPassword: 'fornitore2026',
+    welcomeEmailSent: true,
+    emailSentAt: '2026-08-22 17:40'
   }
 ];
 
@@ -455,6 +501,7 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         groupCode: 'SOPHIA-LIAM-PUGLIA',
         supplierId: 'sup-borgo',
         image: hotelSuiteImg,
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Bottiglia di Primitivo di Manduria DOC in camera all\'arrivo e Late Check-Out ore 13:00 garantito.',
         roomTypes: [
           {
             id: 'rt-puglia-1',
@@ -486,6 +533,7 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         groupCode: 'PUGLIA-LOVE-26',
         supplierId: 'sup-masseria-torre',
         image: heroBanner,
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Accesso gratuito alla spiaggia privata Coccaro Beach Club con lettino e telo mare inclusi.',
         roomTypes: [
           {
             id: 'rt-puglia-3',
@@ -511,7 +559,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         bookedSeats: 11,
         pricePerSeat: 35,
         isPaidByCouple: false,
-        supplierId: 'sup-ncc-puglia'
+        supplierId: 'sup-ncc-puglia',
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Acqua minerale fresca in vettura, salviettina rinfrescante agli agrumi e facchinaggio bagagli incluso.'
       },
       {
         id: 'tr-puglia-2',
@@ -525,7 +574,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         bookedSeats: 7,
         pricePerSeat: 30,
         isPaidByCouple: false,
-        supplierId: 'sup-ncc-puglia'
+        supplierId: 'sup-ncc-puglia',
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Monitoraggio ritardo voli in tempo reale e attesa gratuita fino a 60 minuti.'
       },
       {
         id: 'tr-puglia-3',
@@ -587,7 +637,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         dressCode: 'Resort Chic / Costume da bagno sotto',
         description: 'Escursione privata a bordo di gozzi in legno lungo la costa frastagliata e le spettacolari grotte marine di Polignano a Mare, con bagno al tramonto e calice di Verdeca DOC accompagnato da taralli caldi.',
         supplierId: 'sup-boat-polignano',
-        image: boatTourImg
+        image: boatTourImg,
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Aperitivo al tramonto con taralli caldi, calice di Verdeca DOC e telo mare personalizzato incluso.'
       },
       {
         id: 'exp-puglia-3',
@@ -603,7 +654,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         bookedParticipants: 14,
         dressCode: 'Comodo',
         description: 'Impara l\'antica arte di trascinare le orecchiette insieme alle massaie locali, visita all\'antico frantoio ipogeo e pranzo conviviale sotto il pergolato.',
-        image: hotelSuiteImg
+        image: hotelSuiteImg,
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Grembiule ricamato in lino pugliese in omaggio e ricettario tradizionale in lingua inglese.'
       }
     ],
     extraServices: [
@@ -615,7 +667,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         isPaidByCouple: false,
         duration: '50 min',
         description: 'Make-up a lunga tenuta resistente al caldo estivo, prodotti anallergici di alta gamma applicati direttamente nella tua camera in hotel.',
-        providerName: 'Chiara Valente Bridal Glam'
+        providerName: 'Chiara Valente Bridal Glam',
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Fissatore spray professionale long-lasting e kit ritocco rossetto in omaggio.'
       },
       {
         id: 'srv-hair-styling',
@@ -625,7 +678,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         isPaidByCouple: false,
         duration: '45 min',
         description: 'Piega, chignon o raccolto morbido mediterraneo realizzato su misura dal parrucchiere specializzato in eventi.',
-        providerName: 'Chiara Valente Bridal Glam'
+        providerName: 'Chiara Valente Bridal Glam',
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Trattamento lucidante alle proteine della seta incluso nella sessione.'
       },
       {
         id: 'srv-babysitting',
@@ -705,6 +759,41 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         totalAmountDue: 0, // Solo festa offerta dagli sposi
         paymentStatus: 'FREE',
         registeredAt: '2026-10-05'
+      }
+    ],
+    giftRequests: [
+      {
+        id: 'gift-req-1',
+        weddingCode: 'SOPHIA-LIAM-2026',
+        coupleNames: 'Sophia Rossi & Liam O\'Connor',
+        serviceId: 'tr-puglia-4',
+        serviceTitle: 'Navetta Ufficiale Cerimonia e Ricevimento (A/R)',
+        serviceCategory: 'TRANSFER',
+        guestsCount: 150,
+        unitPrice: 15,
+        totalEstimatedAmount: 2250,
+        currency: 'EUR',
+        coupleNotes: 'Vogliamo regalare il transfer navetta tra le masserie a tutti gli invitati per farli viaggiare in totale relax e sicurezza!',
+        status: 'APPROVED',
+        requestedAt: '2026-08-15 14:30',
+        approvedAt: '2026-08-16 10:00',
+        agencyNotes: 'Approvato! Tariffa convenzionata bloccata con flotta bus VIP e autisti bilingue.'
+      },
+      {
+        id: 'gift-req-2',
+        weddingCode: 'SOPHIA-LIAM-2026',
+        coupleNames: 'Sophia Rossi & Liam O\'Connor',
+        serviceId: 'exp-puglia-2',
+        serviceTitle: 'Gita in Barca & Calice al Tramonto tra le Grotte di Polignano a Mare',
+        serviceCategory: 'EXPERIENCE',
+        guestsCount: 25,
+        unitPrice: 85,
+        totalEstimatedAmount: 2125,
+        currency: 'EUR',
+        coupleNotes: 'Vorremmo regalare questa escursione al tramonto con calice di benvenuto per i 25 ospiti del nostro wedding party ristretto.',
+        status: 'PENDING_APPROVAL',
+        requestedAt: '2026-09-05 18:20',
+        agencyNotes: 'Preventivo in verifica di disponibilità di 2 gozzi affiancati con Donato Zaccaria.'
       }
     ]
   },
