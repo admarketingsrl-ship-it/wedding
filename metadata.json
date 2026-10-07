@@ -1,7 +1,8 @@
 {
-  "name": "Wedding Concierge - Express & Node.js Architettura",
-  "description": "Struttura cartelle, package.json, schema Prisma e server Express per agenzia di gestione ospiti esteri di matrimoni con demo interattiva.",
+  "name": "Apulian Wedding Concierge - Guest Management & Hospitality",
+  "description": "Piattaforma concierge per ospiti esteri di matrimoni in Puglia. Gestione hotel, transfer aeroportuali, esperienze e servizi con AD Marketing Palagianello (TA).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+
 
