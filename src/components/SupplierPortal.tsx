@@ -290,46 +290,82 @@ export default function SupplierPortal({
         </div>
       </div>
 
-      {/* Navigazione Schede Fornitore */}
-      <div className="flex items-center gap-2 border-b border-neutral-200 pb-2">
-        <button
-          onClick={() => setActiveTab('packages')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeTab === 'packages'
-              ? 'bg-neutral-900 text-white shadow-2xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          <span>I Miei Pacchetti per l'Agenzia ({myPackages.length})</span>
-        </button>
+      {/* Navigazione Schede Fornitore: Menu a Pulsanti Adattivo e Responsive (Nessuno scorrimento orizzontale) */}
+      <div className="pt-1 pb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* 1. I Miei Pacchetti */}
+          <button
+            onClick={() => setActiveTab('packages')}
+            className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'packages'
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'packages' ? 'bg-white/15 text-purple-200' : 'bg-purple-100 text-purple-800'}`}>
+              <Package className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="block text-xs font-semibold">I Miei Pacchetti</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'packages' ? 'bg-purple-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {myPackages.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeTab === 'packages' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Camere, tour & transfer per l'agenzia
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeTab === 'orders'
-              ? 'bg-neutral-900 text-white shadow-2xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Mail className="w-4 h-4 text-purple-600" />
-          <span>Prenotazioni Ricevute dagli Ospiti ({myBookings.length})</span>
-          {myBookings.some(b => b.status === 'RECEIVED') && (
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-          )}
-        </button>
+          {/* 2. Prenotazioni Ricevute */}
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'orders'
+                ? 'bg-purple-900 text-white font-semibold shadow-xs border-purple-950 ring-2 ring-purple-900/20'
+                : 'text-neutral-700 hover:text-purple-900 hover:bg-purple-50/60 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'orders' ? 'bg-white/15 text-purple-200' : 'bg-purple-100 text-purple-700'}`}>
+              <Mail className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="block text-xs font-semibold">Prenotazioni Ospiti</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'orders' ? 'bg-white text-purple-900' : 'bg-purple-200 text-purple-800'}`}>
+                  {myBookings.length}
+                </span>
+                {myBookings.some(b => b.status === 'RECEIVED') && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" title="Nuove prenotazioni da gestire" />
+                )}
+              </div>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeTab === 'orders' ? 'text-purple-200' : 'text-neutral-500'}`}>
+                Gestisci saldo e conferma
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-            activeTab === 'profile'
-              ? 'bg-neutral-900 text-white shadow-2xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Dati Aziendali & Pagamenti</span>
-        </button>
+          {/* 3. Dati Aziendali */}
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'profile'
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'profile' ? 'bg-white/15 text-neutral-300' : 'bg-neutral-100 text-neutral-700'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-semibold">Profilo & Saldo</span>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeTab === 'profile' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Coordinate bancarie & contatti
+              </span>
+            </div>
+          </button>
+        </div>
       </div>
 
       {notificationSentSuccess && (

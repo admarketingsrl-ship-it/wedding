@@ -25,6 +25,7 @@ export interface HotelItem {
   supplierId?: string;
   image?: string;
   negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
+  websiteUrl?: string; // Nuova: Collegamento al booking engine della struttura
 }
 
 export interface TransferItem {
@@ -501,6 +502,7 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         groupCode: 'SOPHIA-LIAM-PUGLIA',
         supplierId: 'sup-borgo',
         image: hotelSuiteImg,
+        websiteUrl: 'https://www.borgoegnazia.it/prenotazioni',
         negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Bottiglia di Primitivo di Manduria DOC in camera all\'arrivo e Late Check-Out ore 13:00 garantito.',
         roomTypes: [
           {
@@ -533,6 +535,7 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         groupCode: 'PUGLIA-LOVE-26',
         supplierId: 'sup-masseria-torre',
         image: heroBanner,
+        websiteUrl: 'https://www.torrecoccaro.com/booking',
         negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Accesso gratuito alla spiaggia privata Coccaro Beach Club con lettino e telo mare inclusi.',
         roomTypes: [
           {

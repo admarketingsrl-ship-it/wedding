@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Building2, 
   Car, 
@@ -101,6 +101,26 @@ export default function AdminPanel({
   const [chatReplyText, setChatReplyText] = useState('');
   const [selectedChatGuestEmail, setSelectedChatGuestEmail] = useState<string>('');
 
+  // Matrimonio selezionato
+  const currentWedding = weddings.find(w => w.id === selectedWeddingId) || weddings[0];
+
+  // Sincronizza o imposta automaticamente l'ospite selezionato nella chat se non è ancora impostato
+  useEffect(() => {
+    if (!selectedChatGuestEmail) {
+      // Se ci sono messaggi scambiati di recente, seleziona l'ultimo ospite che ha scritto
+      if (chatMessages.length > 0) {
+        const last = chatMessages[chatMessages.length - 1];
+        if (last && last.guestEmail) {
+          setSelectedChatGuestEmail(last.guestEmail);
+          return;
+        }
+      }
+      if (currentWedding?.guests && currentWedding.guests.length > 0) {
+        setSelectedChatGuestEmail(currentWedding.guests[0].email);
+      }
+    }
+  }, [chatMessages, currentWedding, selectedChatGuestEmail]);
+
   // Modale / Form Nuovo Fornitore Master
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [newSupName, setNewSupName] = useState('');
@@ -140,9 +160,6 @@ export default function AdminPanel({
   // Form Impostazioni Email Notifiche
   const [currentNotificationEmail, setCurrentNotificationEmail] = useState(adminSettings.adminNotificationEmail);
   const [settingsSaved, setSettingsSaved] = useState(false);
-
-  // Matrimonio selezionato
-  const currentWedding = weddings.find(w => w.id === selectedWeddingId) || weddings[0];
 
   // Conteggio messaggi chat non letti
   const unreadMessagesCount = chatMessages.filter(m => !m.readByAdmin).length;
@@ -552,124 +569,293 @@ Tel: ${adminSettings.agencyPhone} | Email: ${adminSettings.adminNotificationEmai
         </div>
       </div>
 
-      {/* Navigazione Moduli Back End */}
-      <div className="flex items-center gap-1 border-b border-neutral-200 pb-2 overflow-x-auto text-xs font-medium">
-        <button
-          onClick={() => setActiveTab('whatsapp')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'whatsapp' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <MessageCircle className="w-4 h-4 text-emerald-400" />
-          <span>Invito WhatsApp Sposi</span>
-        </button>
+      {/* Navigazione Moduli Back End: Menu a Pulsanti Adattivo e Responsive (Nessuno scorrimento orizzontale, 100% fruibile da smartphone e desktop) */}
+      <div className="pt-1 pb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {/* 1. Invito WhatsApp */}
+          <button
+            onClick={() => setActiveTab('whatsapp')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'whatsapp' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'whatsapp' ? 'bg-white/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-semibold truncate">Invito WhatsApp</span>
+              <span className={`text-[10px] block truncate ${activeTab === 'whatsapp' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Testo & link sposi
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('guests-summary')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'guests-summary' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Users className="w-4 h-4 text-sky-400" />
-          <span>Riepilogo Scelte Ospiti ({currentWedding.guests.length})</span>
-        </button>
+          {/* 2. Riepilogo Ospiti */}
+          <button
+            onClick={() => setActiveTab('guests-summary')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'guests-summary' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'guests-summary' ? 'bg-white/15 text-sky-300' : 'bg-sky-50 text-sky-700'}`}>
+              <Users className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Scelte Ospiti</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'guests-summary' ? 'bg-sky-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {currentWedding.guests.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'guests-summary' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Hotel, voli & transfer
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('accounting')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'accounting' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
-          <span>Contabilità & Analisi Ricavi</span>
-        </button>
+          {/* 3. Contabilità & Ricavi */}
+          <button
+            onClick={() => setActiveTab('accounting')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'accounting' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'accounting' ? 'bg-white/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-semibold truncate">Contabilità</span>
+              <span className={`text-[10px] block truncate ${activeTab === 'accounting' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Margini & provvigioni
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('payments')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'payments' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Receipt className="w-4 h-4 text-amber-400" />
-          <span>Richieste di Pagamento</span>
-        </button>
+          {/* 4. Richieste Pagamento */}
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'payments' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'payments' ? 'bg-white/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+              <Receipt className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-semibold truncate">Richieste Saldo</span>
+              <span className={`text-[10px] block truncate ${activeTab === 'payments' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Link & bonifici
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('suppliers')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'suppliers' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Building2 className="w-4 h-4 text-purple-400" />
-          <span>Database Fornitori Master ({suppliers.length})</span>
-        </button>
+          {/* 5. Database Fornitori Master */}
+          <button
+            onClick={() => setActiveTab('suppliers')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'suppliers' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'suppliers' ? 'bg-white/15 text-purple-300' : 'bg-purple-50 text-purple-700'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Fornitori Master</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'suppliers' ? 'bg-purple-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {suppliers.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'suppliers' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Anagrafica & email
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('supplier-packages')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'supplier-packages' ? 'bg-purple-900 text-white font-semibold shadow-2xs' : 'text-purple-700 hover:text-purple-900 hover:bg-purple-50'
-          }`}
-        >
-          <Package className="w-4 h-4 text-purple-400" />
-          <span>Pacchetti Fornitori ({packages.length})</span>
-        </button>
+          {/* 6. Pacchetti Fornitori */}
+          <button
+            onClick={() => setActiveTab('supplier-packages')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'supplier-packages' 
+                ? 'bg-purple-900 text-white font-semibold shadow-xs border-purple-950 ring-2 ring-purple-900/20' 
+                : 'text-purple-800 hover:text-purple-950 hover:bg-purple-50 bg-white border-purple-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'supplier-packages' ? 'bg-white/15 text-purple-200' : 'bg-purple-100 text-purple-800'}`}>
+              <Package className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Pacchetti Partner</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'supplier-packages' ? 'bg-white text-purple-900' : 'bg-purple-200 text-purple-800'}`}>
+                  {packages.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'supplier-packages' ? 'text-purple-200' : 'text-purple-600'}`}>
+                Tariffe negoziate
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('hotels')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'hotels' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <span>Hotel Matrimonio ({currentWedding.hotels.length})</span>
-        </button>
+          {/* 7. Hotel Matrimonio */}
+          <button
+            onClick={() => setActiveTab('hotels')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'hotels' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'hotels' ? 'bg-white/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Hotel Nozze</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'hotels' ? 'bg-amber-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {currentWedding.hotels.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'hotels' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Convenzioni & link
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('transfers')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'transfers' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <span>Transfer ({currentWedding.transfers.length})</span>
-        </button>
+          {/* 8. Transfer & NCC */}
+          <button
+            onClick={() => setActiveTab('transfers')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'transfers' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'transfers' ? 'bg-white/15 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+              <Car className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Transfer & NCC</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'transfers' ? 'bg-blue-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {currentWedding.transfers.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'transfers' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Navette aeroporto
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('experiences')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'experiences' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <span>Esperienze ({currentWedding.experiences.length})</span>
-        </button>
+          {/* 9. Esperienze */}
+          <button
+            onClick={() => setActiveTab('experiences')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'experiences' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'experiences' ? 'bg-white/15 text-pink-300' : 'bg-pink-50 text-pink-700'}`}>
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Esperienze</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'experiences' ? 'bg-pink-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                  {currentWedding.experiences.length}
+                </span>
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'experiences' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Tour & feste
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('wishes')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'wishes' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Lightbulb className="w-4 h-4 text-amber-500" />
-          <span>Desideri Ospiti ({wishRequests.length})</span>
-        </button>
+          {/* 10. Desideri Ospiti */}
+          <button
+            onClick={() => setActiveTab('wishes')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'wishes' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'wishes' ? 'bg-white/15 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+              <Lightbulb className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Desideri Ospiti</span>
+                {wishRequests.length > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'wishes' ? 'bg-amber-400 text-neutral-900' : 'bg-amber-100 text-amber-800'}`}>
+                    {wishRequests.length}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'wishes' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Richieste su misura
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('chat')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'chat' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <MessageCircle className="w-4 h-4 text-emerald-500" />
-          <span>Chat Valeria {unreadMessagesCount > 0 && `(${unreadMessagesCount})`}</span>
-        </button>
+          {/* 11. Chat Valeria */}
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'chat' 
+                ? 'bg-emerald-800 text-white font-semibold shadow-xs border-emerald-950 ring-2 ring-emerald-800/20' 
+                : 'text-emerald-900 hover:text-emerald-950 hover:bg-emerald-50 bg-white border-emerald-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'chat' ? 'bg-white/15 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="block text-xs font-semibold truncate">Chat Valeria</span>
+                {unreadMessagesCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-600 text-white animate-pulse">
+                    {unreadMessagesCount}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] block truncate ${activeTab === 'chat' ? 'text-emerald-200' : 'text-emerald-700'}`}>
+                Messaggi diretti ospiti
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-            activeTab === 'settings' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Email & Info AD Marketing</span>
-        </button>
+          {/* 12. Email & Info AD Marketing */}
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'settings' 
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'settings' ? 'bg-white/15 text-neutral-300' : 'bg-neutral-100 text-neutral-700'}`}>
+              <Settings className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-semibold truncate">Impostazioni</span>
+              <span className={`text-[10px] block truncate ${activeTab === 'settings' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Email agenzia & info
+              </span>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1460,29 +1646,59 @@ Tel: ${adminSettings.agencyPhone} | Email: ${adminSettings.adminNotificationEmai
                 Conversazioni Attive
               </span>
 
-              {currentWedding.guests.map((g) => {
-                const guestMsgs = chatMessages.filter(m => m.guestEmail.toLowerCase() === g.email.toLowerCase());
-                const lastMsg = guestMsgs[guestMsgs.length - 1];
-                const isSelected = selectedChatGuestEmail === g.email;
+              {/* Combina gli ospiti registrati con eventuali ospiti che hanno inviato messaggi in chat */}
+              {(() => {
+                // Raccogli tutte le email degli ospiti per questo matrimonio o globali che hanno scritto
+                const chatGuestMap = new Map<string, { name: string; email: string; flag?: string }>();
+                
+                // Aggiungi ospiti del matrimonio corrente
+                currentWedding.guests.forEach(g => {
+                  chatGuestMap.set(g.email.toLowerCase(), { name: g.name, email: g.email, flag: g.flag });
+                });
 
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => setSelectedChatGuestEmail(g.email)}
-                    className={`w-full text-left p-3 rounded-xl transition-colors cursor-pointer ${
-                      isSelected ? 'bg-white shadow-2xs border border-neutral-300' : 'hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-neutral-900">{g.name}</span>
-                      <span className="text-[10px] text-neutral-400">{g.flag}</span>
-                    </div>
-                    <div className="text-[11px] text-neutral-500 truncate mt-0.5">
-                      {lastMsg ? lastMsg.text : 'Nessun messaggio recente'}
-                    </div>
-                  </button>
-                );
-              })}
+                // Aggiungi eventuali ospiti che hanno scritto in chat ma non erano in lista predefinita
+                chatMessages.forEach(m => {
+                  if (m.guestEmail && !chatGuestMap.has(m.guestEmail.toLowerCase())) {
+                    chatGuestMap.set(m.guestEmail.toLowerCase(), { 
+                      name: m.guestName || m.guestEmail, 
+                      email: m.guestEmail,
+                      flag: '💬'
+                    });
+                  }
+                });
+
+                const allChatGuests = Array.from(chatGuestMap.values());
+
+                return allChatGuests.map((g) => {
+                  const guestMsgs = chatMessages.filter(m => m.guestEmail.toLowerCase() === g.email.toLowerCase());
+                  const lastMsg = guestMsgs[guestMsgs.length - 1];
+                  const hasUnread = guestMsgs.some(m => !m.readByAdmin && m.sender === 'guest');
+                  const isSelected = selectedChatGuestEmail.toLowerCase() === g.email.toLowerCase();
+
+                  return (
+                    <button
+                      key={g.email}
+                      onClick={() => setSelectedChatGuestEmail(g.email)}
+                      className={`w-full text-left p-3 rounded-xl transition-colors cursor-pointer border ${
+                        isSelected 
+                          ? 'bg-white shadow-2xs border-emerald-600 ring-1 ring-emerald-600' 
+                          : 'border-transparent hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-neutral-900 flex items-center gap-1.5">
+                          {hasUnread && <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />}
+                          <span>{g.name}</span>
+                        </span>
+                        <span className="text-[10px] text-neutral-400">{g.flag || '💍'}</span>
+                      </div>
+                      <div className="text-[11px] text-neutral-500 truncate mt-0.5">
+                        {lastMsg ? lastMsg.text : 'Nessun messaggio recente'}
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
             </div>
 
             {/* Area Dettaglio Chat & Risposta */}

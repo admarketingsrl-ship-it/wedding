@@ -534,11 +534,13 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile Submenu Bar */}
-        <div className="md:hidden flex items-center justify-around border-t border-neutral-100 bg-white px-2 py-2 text-[11px] font-medium text-neutral-600 overflow-x-auto">
+        {/* Mobile Submenu Bar (Menu Adattivo e Responsive, Nessuno scorrimento orizzontale) */}
+        <div className="md:hidden flex flex-wrap items-center justify-center gap-1.5 border-t border-neutral-100 bg-white px-3 py-2 text-[11px] font-medium text-neutral-600">
           <button
             onClick={() => setCurrentView('home')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap ${currentView === 'home' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              currentView === 'home' ? 'bg-neutral-900 text-white font-bold shadow-2xs' : 'hover:bg-neutral-100 text-neutral-700'
+            }`}
           >
             Home / Login
           </button>
@@ -546,36 +548,59 @@ export default function App() {
           {authRole === 'guest' && (
             <button
               onClick={() => setCurrentView('guest')}
-              className={`px-2.5 py-1 rounded whitespace-nowrap ${currentView === 'guest' ? 'bg-neutral-900 text-white font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                currentView === 'guest' ? 'bg-neutral-900 text-white font-bold shadow-2xs' : 'hover:bg-neutral-100 text-neutral-700'
+              }`}
             >
-              Mio Matrimonio
+              <Globe className="w-3 h-3" />
+              <span>Mio Matrimonio</span>
             </button>
           )}
 
           {authRole === 'couple' && (
             <button
               onClick={() => setCurrentView('couple')}
-              className={`px-2.5 py-1 rounded whitespace-nowrap ${currentView === 'couple' ? 'bg-rose-900 text-white font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                currentView === 'couple' ? 'bg-rose-900 text-white font-bold shadow-2xs' : 'hover:bg-rose-50 text-rose-800'
+              }`}
             >
-              Area Sposi
+              <Heart className="w-3 h-3 fill-current" />
+              <span>Area Sposi</span>
             </button>
           )}
 
           {authRole === 'admin' && (
-            <button
-              onClick={() => setCurrentView('admin')}
-              className={`px-2.5 py-1 rounded whitespace-nowrap ${currentView === 'admin' ? 'bg-neutral-900 text-white font-bold' : ''}`}
-            >
-              Pannello Agenzia
-            </button>
+            <>
+              <button
+                onClick={() => setCurrentView('admin')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                  currentView === 'admin' ? 'bg-neutral-900 text-white font-bold shadow-2xs' : 'hover:bg-neutral-100 text-neutral-700'
+                }`}
+              >
+                <Building2 className="w-3 h-3" />
+                <span>Pannello Agenzia</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                  currentView === 'dashboard' ? 'bg-neutral-900 text-white font-bold shadow-2xs' : 'hover:bg-neutral-100 text-neutral-700'
+                }`}
+              >
+                <Users className="w-3 h-3" />
+                <span>Monitoraggio</span>
+              </button>
+            </>
           )}
 
           {authRole === 'supplier' && (
             <button
               onClick={() => setCurrentView('supplier')}
-              className={`px-2.5 py-1 rounded whitespace-nowrap ${currentView === 'supplier' ? 'bg-purple-900 text-white font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                currentView === 'supplier' ? 'bg-purple-900 text-white font-bold shadow-2xs' : 'hover:bg-purple-50 text-purple-800'
+              }`}
             >
-              Area Fornitore
+              <Package className="w-3 h-3" />
+              <span>Area Fornitore</span>
             </button>
           )}
         </div>

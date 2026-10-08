@@ -33,7 +33,8 @@ import {
   X,
   Pencil,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Send
 } from 'lucide-react';
 import { 
   WeddingData, 
@@ -63,7 +64,14 @@ export default function CouplePortal({
   adminSettings
 }: CouplePortalProps) {
   // Tabs di navigazione per gli sposi
-  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'secondary' | 'communication' | 'guests'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'secondary' | 'gift-services' | 'communication' | 'guests'>('details');
+
+  // Stato Regala Servizi agli Ospiti (con calcolo preventivo e approvazione agenzia)
+  const [giftGuestsCount, setGiftGuestsCount] = useState<number>(weddingData.guests.length || 24);
+  const [selectedGiftExpIds, setSelectedGiftExpIds] = useState<string[]>(
+    weddingData.experiences.filter(e => e.isHostSponsored).map(e => e.id)
+  );
+  const [giftProposalStatus, setGiftProposalStatus] = useState<'IDLE' | 'SENT_TO_AGENCY' | 'APPROVED'>('IDLE');
 
   // Stato Dettagli Matrimonio
   const [coupleNames, setCoupleNames] = useState(weddingData.coupleNames);
@@ -620,68 +628,151 @@ ${coupleNames} ❤️`;
       </div>
 
       {/* ========================================================================= */}
-      {/* NAVIGAZIONE SCHEDE AREA SPOSI                                            */}
+      {/* NAVIGAZIONE SCHEDE AREA SPOSI: Menu a Pulsanti Adattivo e Responsive      */}
+      {/* (Nessuno scorrimento orizzontale, 100% fruibile da smartphone e desktop)  */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-neutral-200 rounded-2xl p-1.5 shadow-2xs flex flex-wrap gap-1">
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'details'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-          }`}
-        >
-          <Heart className="w-3.5 h-3.5 text-rose-400" />
-          <span>Dettagli Matrimonio & Programma</span>
-        </button>
+      <div className="bg-white border border-neutral-200 rounded-2xl p-2.5 shadow-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {/* 1. Dettagli & Programma */}
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'details'
+                ? 'bg-neutral-900 text-white shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/80 border-neutral-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'details' ? 'bg-white/15' : 'bg-rose-100 text-rose-700'}`}>
+              <Heart className="w-4 h-4 fill-current" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <span className="block truncate">Dettagli Nozze</span>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'details' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                {schedule.length} momenti
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('photos')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'photos'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-          }`}
-        >
-          <Camera className="w-3.5 h-3.5 text-amber-400" />
-          <span>Carica Foto & Galleria ({galleryPhotos.length})</span>
-        </button>
+          {/* 2. Foto & Galleria */}
+          <button
+            onClick={() => setActiveTab('photos')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'photos'
+                ? 'bg-neutral-900 text-white shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/80 border-neutral-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'photos' ? 'bg-white/15' : 'bg-amber-100 text-amber-700'}`}>
+              <Camera className="w-4 h-4" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-1">
+                <span className="truncate">Galleria Foto</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'photos' ? 'bg-amber-400 text-neutral-900' : 'bg-neutral-200 text-neutral-700'}`}>
+                  {galleryPhotos.length}
+                </span>
+              </div>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'photos' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Copertina & album
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('secondary')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'secondary'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-          }`}
-        >
-          <Info className="w-3.5 h-3.5 text-sky-400" />
-          <span>Informazioni Secondarie & Guida ({secondaryInfo.length})</span>
-        </button>
+          {/* 3. Guida & Info Secondarie */}
+          <button
+            onClick={() => setActiveTab('secondary')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'secondary'
+                ? 'bg-neutral-900 text-white shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/80 border-neutral-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'secondary' ? 'bg-white/15' : 'bg-sky-100 text-sky-700'}`}>
+              <Info className="w-4 h-4" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-1">
+                <span className="truncate">Guida Utile</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'secondary' ? 'bg-sky-400 text-neutral-900' : 'bg-neutral-200 text-neutral-700'}`}>
+                  {secondaryInfo.length}
+                </span>
+              </div>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'secondary' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Meteo, regali & FAQ
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('communication')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'communication'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-          }`}
-        >
-          <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Comunicazione & Invito WhatsApp</span>
-        </button>
+          {/* 4. Regala Servizi agli Ospiti */}
+          <button
+            onClick={() => setActiveTab('gift-services')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'gift-services'
+                ? 'bg-amber-600 text-white shadow-xs border-amber-700 ring-2 ring-amber-600/20'
+                : 'text-amber-900 hover:text-amber-950 hover:bg-amber-50 bg-amber-50/60 border-amber-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'gift-services' ? 'bg-white/15 text-white' : 'bg-amber-200 text-amber-900'}`}>
+              <Gift className="w-4 h-4" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-1">
+                <span className="truncate">Regala Servizi</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'gift-services' ? 'bg-white text-amber-800' : 'bg-amber-300 text-amber-950'}`}>
+                  Offri tu
+                </span>
+              </div>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'gift-services' ? 'text-amber-100' : 'text-amber-700'}`}>
+                Preventivo & omaggi
+              </span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('guests')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'guests'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Riepilogo Invitati ({weddingData.guests.length})</span>
-        </button>
+          {/* 5. Comunicazione & Invito WhatsApp */}
+          <button
+            onClick={() => setActiveTab('communication')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'communication'
+                ? 'bg-emerald-800 text-white shadow-xs border-emerald-900 ring-2 ring-emerald-800/20'
+                : 'text-emerald-900 hover:text-emerald-950 hover:bg-emerald-100/70 bg-emerald-50/80 border-emerald-200/70'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'communication' ? 'bg-white/15' : 'bg-emerald-100 text-emerald-800'}`}>
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <span className="block truncate">Invito WhatsApp</span>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'communication' ? 'text-emerald-200' : 'text-emerald-700'}`}>
+                Messaggi e avvisi
+              </span>
+            </div>
+          </button>
+
+          {/* 6. Riepilogo Invitati */}
+          <button
+            onClick={() => setActiveTab('guests')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 p-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer border ${
+              activeTab === 'guests'
+                ? 'bg-neutral-900 text-white shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/80 border-neutral-200'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'guests' ? 'bg-white/15' : 'bg-indigo-100 text-indigo-700'}`}>
+              <Users className="w-4 h-4" />
+            </div>
+            <div className="text-center sm:text-left leading-tight min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-1">
+                <span className="truncate">Riepilogo Ospiti</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'guests' ? 'bg-indigo-400 text-neutral-900' : 'bg-neutral-200 text-neutral-700'}`}>
+                  {weddingData.guests.length}
+                </span>
+              </div>
+              <span className={`text-[10px] hidden sm:block truncate ${activeTab === 'guests' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                Presenze & opzioni
+              </span>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1403,7 +1494,245 @@ ${coupleNames} ❤️`;
       )}
 
       {/* ========================================================================= */}
-      {/* 4. COMUNICAZIONE SPOSI: BACHECA AVVISI & INVITO WHATSAPP                   */}
+      {/* 4. REGALA SERVIZI ED ESPERIENZE AGLI OSPITI (CALCOLO PREVENTIVO SPOSI)   */}
+      {/* ========================================================================= */}
+      {activeTab === 'gift-services' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-neutral-200 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
+            <div className="border-b border-neutral-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-700">
+                  <Gift className="w-4 h-4 text-amber-600" />
+                  <span>Omaggi & Ospitalità dagli Sposi</span>
+                </div>
+                <h3 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1">
+                  Regala Esperienze e Servizi ai Tuoi Invitati
+                </h3>
+                <p className="text-xs text-neutral-600 mt-1 max-w-2xl">
+                  Scegli quali servizi desideri offrire e regalare ai tuoi ospiti. Il sistema calcola in tempo reale il preventivo complessivo in base al numero di invitati stimati. Una volta confermata dall'agenzia AD Marketing, l'esperienza risulterà <strong>100% Gratuita (Offerta con affetto dagli Sposi)</strong> nel portale ospiti.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="shrink-0">
+                {giftProposalStatus === 'APPROVED' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Approvato dall'Agenzia</span>
+                  </span>
+                ) : giftProposalStatus === 'SENT_TO_AGENCY' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <span>In Valutazione Agenzia</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-700 text-xs font-semibold border border-neutral-200">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>Configura Preventivo</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Configurazione Parametri & Numero Ospiti */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/60 border border-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-amber-950 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-800" />
+                  <span>Numero Ospiti per cui Offrire i Servizi:</span>
+                </span>
+                <p className="text-[11px] text-amber-800">
+                  Calcola la spesa moltiplicando la tariffa convenzionata per il numero di partecipanti.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setGiftGuestsCount(Math.max(1, giftGuestsCount - 5))}
+                  className="w-8 h-8 rounded-lg bg-white border border-amber-300 font-bold text-neutral-800 hover:bg-amber-100 transition-colors cursor-pointer"
+                >
+                  -
+                </button>
+                <div className="text-center">
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={giftGuestsCount}
+                    onChange={(e) => setGiftGuestsCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center font-bold text-sm bg-white border border-amber-300 rounded-lg py-1 px-2 text-neutral-900"
+                  />
+                  <span className="block text-[10px] text-amber-800 font-medium mt-0.5">ospiti previsti</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGiftGuestsCount(giftGuestsCount + 5)}
+                  className="w-8 h-8 rounded-lg bg-white border border-amber-300 font-bold text-neutral-800 hover:bg-amber-100 transition-colors cursor-pointer"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGiftGuestsCount(weddingData.guests.length || 24)}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-amber-300 text-amber-900 rounded-lg hover:bg-amber-100 cursor-pointer"
+                >
+                  Tutti ({weddingData.guests.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Catalogo Esperienze con Selezione Regalo */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                  Seleziona i Servizi da Offrire:
+                </span>
+                <span className="text-xs text-neutral-500">
+                  {selectedGiftExpIds.length} servizi selezionati
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {weddingData.experiences.map((exp) => {
+                  const isSelected = selectedGiftExpIds.includes(exp.id);
+                  const subTotal = exp.pricePerPerson * giftGuestsCount;
+
+                  return (
+                    <div
+                      key={exp.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedGiftExpIds(selectedGiftExpIds.filter(id => id !== exp.id));
+                        } else {
+                          setSelectedGiftExpIds([...selectedGiftExpIds, exp.id]);
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-500/20 shadow-xs'
+                          : 'bg-white hover:bg-neutral-50 border-neutral-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-neutral-100 text-neutral-700">
+                            {exp.category}
+                          </span>
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                            isSelected ? 'bg-amber-600 border-amber-600 text-white' : 'border-neutral-300 bg-white'
+                          }`}>
+                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-neutral-900 leading-snug">
+                          {exp.title}
+                        </h4>
+                        <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2 leading-relaxed">
+                          {exp.description}
+                        </p>
+
+                        <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs">
+                          <span className="text-neutral-500">Tariffa a persona:</span>
+                          <span className="font-semibold text-neutral-900">€{exp.pricePerPerson}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2 border-t border-neutral-200/80 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-amber-900">
+                          Totale per {giftGuestsCount} ospiti:
+                        </span>
+                        <span className="text-sm font-bold text-amber-800">
+                          €{subTotal.toLocaleString('it-IT')}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Box Preventivo Totale & Azioni */}
+            {(() => {
+              const totalGiftEstimate = selectedGiftExpIds.reduce((sum, id) => {
+                const exp = weddingData.experiences.find(e => e.id === id);
+                return sum + (exp ? exp.pricePerPerson * giftGuestsCount : 0);
+              }, 0);
+
+              const handleSendToAgency = () => {
+                setGiftProposalStatus('SENT_TO_AGENCY');
+                triggerToast(`Proposta di ${selectedGiftExpIds.length} regali inviata a Valeria (AD Marketing) per approvazione e tariffa negoziata.`);
+              };
+
+              const handleApproveLocally = () => {
+                // Imposta come approvato e aggiorna le esperienze
+                setGiftProposalStatus('APPROVED');
+                const updatedExperiences = weddingData.experiences.map(e => ({
+                  ...e,
+                  isHostSponsored: selectedGiftExpIds.includes(e.id) ? true : e.isHostSponsored
+                }));
+                const updatedWedding = {
+                  ...weddingData,
+                  experiences: updatedExperiences
+                };
+                onUpdateWedding(updatedWedding);
+                triggerToast('Servizi approvati! Ora appariranno come "Offerti dagli Sposi (Gratuiti)" per gli ospiti nel portale.');
+              };
+
+              return (
+                <div className="p-5 rounded-2xl bg-neutral-900 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-5">
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+                      Riepilogo Preventivo Servizi Offerti
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-3xl font-serif-luxury font-bold text-white">
+                        €{totalGiftEstimate.toLocaleString('it-IT')}
+                      </span>
+                      <span className="text-xs text-neutral-400">
+                        ({selectedGiftExpIds.length} servizi per {giftGuestsCount} ospiti)
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-300 mt-1 max-w-lg">
+                      {selectedGiftExpIds.length > 0
+                        ? `Gli ospiti non pagheranno nulla per queste esperienze: il saldo sarà concordato con l'agenzia AD Marketing a tariffa preferenziale.`
+                        : 'Seleziona almeno un servizio per calcolare il preventivo e offrirlo agli ospiti.'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={selectedGiftExpIds.length === 0}
+                      onClick={handleSendToAgency}
+                      className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>Invia Richiesta all'Agenzia</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={selectedGiftExpIds.length === 0}
+                      onClick={handleApproveLocally}
+                      className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      title="Simula approvazione immediata agenzia"
+                    >
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span>Convalida & Attiva Subito</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. INVITO WHATSAPP DEGLI SPOSI (ex Sezione 4)                              */}
+
       {/* ========================================================================= */}
       {activeTab === 'communication' && (
         <div className="space-y-8">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Building2, 
   Car, 
@@ -26,7 +26,18 @@ import {
   Gift,
   Sun,
   Utensils,
-  Compass
+  Compass,
+  ShoppingCart,
+  Users,
+  ExternalLink,
+  Calculator,
+  AlertTriangle,
+  RotateCcw,
+  PlusCircle,
+  XCircle,
+  FileText,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import { 
   WeddingData, 
@@ -113,6 +124,49 @@ export default function GuestPortal({
   // Stato Invio Voucher Email
   const [emailSentStatus, setEmailSentStatus] = useState<{ sent: boolean; message: string; timestamp?: string } | null>(null);
 
+  // Stato Calcolatore Booking Engine Struttura / Booking.com
+  const [calcAdults, setCalcAdults] = useState<number>(2);
+  const [calcChildren, setCalcChildren] = useState<number>(0);
+  const [calcRoomsCount, setCalcRoomsCount] = useState<number>(1);
+  const [isQueryingBookingEngine, setIsQueryingBookingEngine] = useState<boolean>(false);
+  const [calculatedQuote, setCalculatedQuote] = useState<{
+    hotelId: string;
+    hotelName: string;
+    roomType: string;
+    nights: number;
+    pricePerNight: number;
+    totalAmount: number;
+    available: boolean;
+    directBookingUrl: string;
+    sourceName: string;
+  } | null>(null);
+
+  // Stato Scheda Prenotazione Confermata dall'Ospite (Riepilogo Opzioni con modifica, annulla, aggiungi)
+  const [confirmedBookingCard, setConfirmedBookingCard] = useState<{
+    id: string;
+    confirmedAt: string;
+    status: 'CONFERMATO' | 'IN_GESTIONE' | 'MODIFICATO' | 'ANNULLATO';
+    items: {
+      category: 'HOTEL' | 'TRANSFER' | 'EXPERIENCE' | 'SERVICE';
+      title: string;
+      details: string;
+      cost: number;
+      freeByCouple?: boolean;
+      cancellationPolicy: string;
+      canCancel: boolean;
+      canModify: boolean;
+      deadlineDate: string;
+    }[];
+    totalDue: number;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem(`guest_confirmed_booking_${weddingData.weddingCode}_${guestInfo.email}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const currentHotel = wantsHotel ? weddingData.hotels.find(h => h.id === selectedHotelId) : null;
   const currentTransfer = wantsTransfer ? weddingData.transfers.find(t => t.id === selectedTransferId) : null;
 
@@ -165,6 +219,214 @@ export default function GuestPortal({
     setWishTitle('');
     setWishDescription('');
     setTimeout(() => setWishSuccessMessage(false), 5000);
+  };
+
+  // Calcolo notti di soggiorno
+  const calculateNights = () => {
+    try {
+      const dIn = new Date(checkIn);
+      const dOut = new Date(checkOut);
+      const diffTime = dOut.getTime() - dIn.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 1;
+    } catch {
+      return 1;
+    }
+  };
+
+  // Interroga il booking engine della struttura o Booking.com per calcolo rapido e disponibilità
+  const handleQueryBookingEngine = (hotel: HotelItem) => {
+    setIsQueryingBookingEngine(true);
+    const nights = calculateNights();
+    
+    // Tasso base camera selezionata o prima disponibile
+    const currentRt = hotel.roomTypes.find(rt => rt.name === selectedRoomTypeName) || hotel.roomTypes[0];
+    const baseRate = currentRt ? currentRt.pricePerNight : hotel.negotiatedRate;
+    
+    // Supplemento occupanti extra oltre 2 adulti (+20% per persona extra)
+    const extraOccupants = Math.max(0, (calcAdults + calcChildren) - 2);
+    const extraMultiplier = 1 + (extraOccupants * 0.2);
+    const effectiveRatePerNight = Math.round(baseRate * extraMultiplier * calcRoomsCount);
+    const totalCost = effectiveRatePerNight * nights;
+
+    // Costruzione URL diretto verso il booking engine interno o Booking.com
+    let directUrl = hotel.websiteUrl;
+    let sourceName = 'Booking Engine Diretto Struttura';
+
+    if (hotel.websiteUrl) {
+      // Parametri query di prenotazione passati al booking engine dell'hotel
+      directUrl = `${hotel.websiteUrl}?checkin=${checkIn}&checkout=${checkOut}&adults=${calcAdults}&children=${calcChildren}&rooms=${calcRoomsCount}&code=${encodeURIComponent(hotel.groupCode || weddingData.weddingCode)}`;
+      sourceName = `Booking Engine Ufficiale (${hotel.name})`;
+    } else {
+      // In assenza di booking engine proprio, collega a Booking.com
+      const checkinDate = new Date(checkIn);
+      const checkoutDate = new Date(checkOut);
+      directUrl = `https://www.booking.com/searchresults.it.html?ss=${encodeURIComponent(hotel.name + ' ' + hotel.address)}&checkin_year=${checkinDate.getFullYear()}&checkin_month=${checkinDate.getMonth() + 1}&checkin_monthday=${checkinDate.getDate()}&checkout_year=${checkoutDate.getFullYear()}&checkout_month=${checkoutDate.getMonth() + 1}&checkout_monthday=${checkoutDate.getDate()}&group_adults=${calcAdults}&group_children=${calcChildren}&no_rooms=${calcRoomsCount}`;
+      sourceName = 'Booking.com (Servizio Esterno Partner)';
+    }
+
+    setTimeout(() => {
+      setCalculatedQuote({
+        hotelId: hotel.id,
+        hotelName: hotel.name,
+        roomType: currentRt ? currentRt.name : 'Camera Matrimoniale',
+        nights,
+        pricePerNight: effectiveRatePerNight,
+        totalAmount: totalCost,
+        available: true,
+        directBookingUrl: directUrl,
+        sourceName
+      });
+      setIsQueryingBookingEngine(false);
+    }, 700);
+  };
+
+  // Opziona la struttura con il preventivo calcolato
+  const handleSelectCalculatedQuote = () => {
+    if (!calculatedQuote) return;
+    setSelectedHotelId(calculatedQuote.hotelId);
+    setSelectedRoomTypeName(calculatedQuote.roomType);
+    setWantsHotel(true);
+  };
+
+  // Conferma definitiva e invio scelte (Crea o Aggiorna la Scheda Opzioni Scelte con Restrizioni Admin)
+  const handleConfirmAndSendChoices = () => {
+    const timestamp = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const fullDate = new Date().toISOString().split('T')[0];
+
+    const items: {
+      category: 'HOTEL' | 'TRANSFER' | 'EXPERIENCE' | 'SERVICE';
+      title: string;
+      details: string;
+      cost: number;
+      freeByCouple?: boolean;
+      cancellationPolicy: string;
+      canCancel: boolean;
+      canModify: boolean;
+      deadlineDate: string;
+    }[] = [];
+
+    // 1. Hotel
+    if (wantsHotel && currentHotel) {
+      items.push({
+        category: 'HOTEL',
+        title: `${currentHotel.name} - ${selectedRoomTypeName}`,
+        details: `Check-in: ${checkIn} | Check-out: ${checkOut} (${calculateNights()} notti) · ${calcAdults} Adulti, ${calcChildren} Ragazzi`,
+        cost: currentHotel.negotiatedRate * calculateNights(),
+        freeByCouple: false,
+        cancellationPolicy: `Restrizione Amministratore: Cancellazione gratuita fino al ${currentHotel.bookingDeadline || '15 Luglio 2026'}. Successivamente è trattenuta la prima notte.`,
+        canCancel: true,
+        canModify: true,
+        deadlineDate: currentHotel.bookingDeadline || '2026-07-15'
+      });
+    }
+
+    // 2. Transfer
+    if (wantsTransfer && currentTransfer) {
+      items.push({
+        category: 'TRANSFER',
+        title: currentTransfer.title,
+        details: `Volo ${flightNumber} del ${flightArrivalDate} · ${luggageCount} Bagagli`,
+        cost: currentTransfer.isPaidByCouple ? 0 : currentTransfer.pricePerSeat * 2,
+        freeByCouple: currentTransfer.isPaidByCouple,
+        cancellationPolicy: 'Restrizione Amministratore: Modifica orario consentita fino a 48h prima del volo. Cancellazione gratuita entro 7 giorni.',
+        canCancel: true,
+        canModify: true,
+        deadlineDate: '2026-09-04'
+      });
+    }
+
+    // 3. Esperienze
+    selectedExperienceIds.forEach(id => {
+      const exp = weddingData.experiences.find(e => e.id === id);
+      if (exp) {
+        items.push({
+          category: 'EXPERIENCE',
+          title: exp.title,
+          details: `${exp.eventDate} alle ore ${exp.startTime} · ${exp.meetingPoint}`,
+          cost: exp.isHostSponsored ? 0 : exp.pricePerPerson * 2,
+          freeByCouple: exp.isHostSponsored,
+          cancellationPolicy: exp.isHostSponsored 
+            ? 'Esperienza offerta dagli sposi: comunicare disdetta con almeno 3 giorni di anticipo per liberare i posti ad altri ospiti.'
+            : 'Restrizione Amministratore: Rimborsabile al 100% se annullata entro 5 giorni prima dell\'evento per rispetto dei fornitori locali.',
+          canCancel: true,
+          canModify: false,
+          deadlineDate: '2026-09-05'
+        });
+      }
+    });
+
+    // 4. Servizi Extra
+    selectedServiceIds.forEach(id => {
+      const srv = weddingData.extraServices.find(s => s.id === id);
+      if (srv) {
+        items.push({
+          category: 'SERVICE',
+          title: srv.title,
+          details: `${srv.providerName} (${srv.duration}) - Servizio in camera`,
+          cost: srv.isPaidByCouple ? 0 : srv.price,
+          freeByCouple: srv.isPaidByCouple,
+          cancellationPolicy: 'Restrizione Amministratore: Orario concordato con la truccatrice/parrucchiere; modifiche consentite solo in base agli slot residui dell\'agenda.',
+          canCancel: true,
+          canModify: true,
+          deadlineDate: '2026-09-08'
+        });
+      }
+    });
+
+    const newCard = {
+      id: `conf-${Date.now()}`,
+      confirmedAt: `${fullDate} ${timestamp}`,
+      status: 'CONFERMATO' as const,
+      items,
+      totalDue: calculateTotalDue()
+    };
+
+    setConfirmedBookingCard(newCard);
+    try {
+      localStorage.setItem(`guest_confirmed_booking_${weddingData.weddingCode}_${guestInfo.email}`, JSON.stringify(newCard));
+    } catch {
+      // Ignora errori storage
+    }
+
+    // Esegui anche notifica email e ordini fornitori
+    handleSendVoucherEmail();
+
+    // Sposta l'utente sulla visualizzazione della scheda confermata
+    setActiveTab('itinerary');
+  };
+
+  // Annulla una voce confermata in base alle restrizioni
+  const handleCancelConfirmedItem = (category: string, title: string) => {
+    if (!confirmedBookingCard) return;
+
+    if (category === 'HOTEL') {
+      setWantsHotel(false);
+    } else if (category === 'TRANSFER') {
+      setWantsTransfer(false);
+    } else if (category === 'EXPERIENCE') {
+      const exp = weddingData.experiences.find(e => e.title === title);
+      if (exp) {
+        setSelectedExperienceIds(prev => prev.filter(id => id !== exp.id));
+      }
+    } else if (category === 'SERVICE') {
+      const srv = weddingData.extraServices.find(s => s.title === title);
+      if (srv) {
+        setSelectedServiceIds(prev => prev.filter(id => id !== srv.id));
+      }
+    }
+
+    const updatedItems = confirmedBookingCard.items.filter(it => it.title !== title);
+    const updatedCard = {
+      ...confirmedBookingCard,
+      items: updatedItems,
+      status: 'MODIFICATO' as const,
+      totalDue: calculateTotalDue()
+    };
+    setConfirmedBookingCard(updatedCard);
+    try {
+      localStorage.setItem(`guest_confirmed_booking_${weddingData.weddingCode}_${guestInfo.email}`, JSON.stringify(updatedCard));
+    } catch {}
   };
 
   // Calcolo totale da saldare per servizi a pagamento
@@ -423,87 +685,196 @@ export default function GuestPortal({
           </div>
         )}
 
-        {/* Barra di Navigazione Libera per l'Ospite (Nessun obbligo sequenziale!) */}
-        <div className="flex items-center gap-1.5 border-t border-neutral-100 pt-4 overflow-x-auto text-xs font-medium">
-          <button
-            onClick={() => setActiveTab('couple-info')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'couple-info' ? 'bg-rose-900 text-white font-semibold shadow-2xs' : 'text-rose-900 hover:text-rose-950 hover:bg-rose-50 bg-rose-50/60'
-            }`}
-          >
-            <Heart className="w-3.5 h-3.5 fill-current" />
-            <span>Dagli Sposi & Guida</span>
-          </button>
+        {/* Pulsanti Navigazione Adattivi alla larghezza dello schermo (Nessuno scorrimento orizzontale, 100% responsive e carini) */}
+        <div className="border-t border-neutral-100 pt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {/* 1. Dagli Sposi */}
+            <button
+              onClick={() => setActiveTab('couple-info')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'couple-info' 
+                  ? 'bg-rose-900 text-white font-semibold shadow-xs border-rose-950 ring-2 ring-rose-900/20' 
+                  : 'text-rose-900 hover:text-rose-950 hover:bg-rose-100/70 bg-rose-50/80 border-rose-200/70'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'couple-info' ? 'bg-white/15' : 'bg-rose-100 text-rose-800'}`}>
+                <Heart className="w-4 h-4 fill-current" />
+              </div>
+              <div className="leading-tight">
+                <span className="block text-xs font-semibold">Dagli Sposi</span>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'couple-info' ? 'text-rose-200' : 'text-rose-700'}`}>Guida nozze</span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('hotels')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'hotels' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>1. Hotel & Soggiorno {wantsHotel && currentHotel ? '✓' : ''}</span>
-          </button>
+            {/* 2. Hotel & Soggiorno */}
+            <button
+              onClick={() => setActiveTab('hotels')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'hotels' 
+                  ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/90 border-neutral-200'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'hotels' ? 'bg-white/15' : 'bg-neutral-200/60 text-neutral-800'}`}>
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center justify-center sm:justify-start gap-1">
+                  <span className="block text-xs font-semibold">Hotel</span>
+                  {wantsHotel && currentHotel && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Selezionato" />
+                  )}
+                </div>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'hotels' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  {wantsHotel && currentHotel ? 'Opzionato' : 'Convenzioni'}
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('transfers')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'transfers' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-            }`}
-          >
-            <Car className="w-3.5 h-3.5" />
-            <span>2. Transfer Aeroporto {wantsTransfer && currentTransfer ? '✓' : ''}</span>
-          </button>
+            {/* 3. Transfer Aeroporto */}
+            <button
+              onClick={() => setActiveTab('transfers')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'transfers' 
+                  ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/90 border-neutral-200'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'transfers' ? 'bg-white/15' : 'bg-neutral-200/60 text-neutral-800'}`}>
+                <Car className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center justify-center sm:justify-start gap-1">
+                  <span className="block text-xs font-semibold">Transfer</span>
+                  {wantsTransfer && currentTransfer && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Selezionato" />
+                  )}
+                </div>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'transfers' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  Navette & NCC
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('experiences')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'experiences' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>3. Esperienze & Party ({selectedExperienceIds.length})</span>
-          </button>
+            {/* 4. Esperienze & Party */}
+            <button
+              onClick={() => setActiveTab('experiences')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'experiences' 
+                  ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/90 border-neutral-200'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'experiences' ? 'bg-white/15' : 'bg-neutral-200/60 text-neutral-800'}`}>
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center justify-center sm:justify-start gap-1">
+                  <span className="block text-xs font-semibold">Esperienze</span>
+                  {selectedExperienceIds.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500 text-white">
+                      {selectedExperienceIds.length}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'experiences' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  Feste & Tour
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('services')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'services' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-            }`}
-          >
-            <Scissors className="w-3.5 h-3.5" />
-            <span>4. Trucco & Parrucco ({selectedServiceIds.length})</span>
-          </button>
+            {/* 5. Trucco & Parrucco */}
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'services' 
+                  ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/90 border-neutral-200'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'services' ? 'bg-white/15' : 'bg-neutral-200/60 text-neutral-800'}`}>
+                <Scissors className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center justify-center sm:justify-start gap-1">
+                  <span className="block text-xs font-semibold">Beauty</span>
+                  {selectedServiceIds.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500 text-white">
+                      {selectedServiceIds.length}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'services' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  Trucco & Capelli
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('wishes')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'wishes' ? 'bg-neutral-900 text-white font-semibold shadow-2xs' : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-            }`}
-          >
-            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-            <span>5. Desideri su Misura</span>
-          </button>
+            {/* 6. Desideri su Misura */}
+            <button
+              onClick={() => setActiveTab('wishes')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'wishes' 
+                  ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20' 
+                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 bg-neutral-50/90 border-neutral-200'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'wishes' ? 'bg-white/15' : 'bg-amber-100 text-amber-700'}`}>
+                <Lightbulb className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <span className="block text-xs font-semibold">Desideri</span>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'wishes' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  Su Misura
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'chat' ? 'bg-emerald-800 text-white font-semibold shadow-2xs' : 'text-emerald-800 hover:bg-emerald-50'
-            }`}
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            <span>Chat Valeria</span>
-          </button>
+            {/* 7. Chat Valeria */}
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'chat' 
+                  ? 'bg-emerald-800 text-white font-semibold shadow-xs border-emerald-900 ring-2 ring-emerald-800/20' 
+                  : 'text-emerald-900 hover:text-emerald-950 hover:bg-emerald-100/70 bg-emerald-50/80 border-emerald-200/70'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'chat' ? 'bg-white/15' : 'bg-emerald-100 text-emerald-800'}`}>
+                <MessageCircle className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <span className="block text-xs font-semibold">Valeria</span>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'chat' ? 'text-emerald-200' : 'text-emerald-700'}`}>
+                  Chat Concierge
+                </span>
+              </div>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('itinerary')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors shrink-0 ${
-              activeTab === 'itinerary' ? 'bg-amber-600 text-white font-semibold shadow-2xs' : 'text-amber-800 hover:bg-amber-50'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Il Mio Voucher</span>
-          </button>
+            {/* 8. Riepilogo Scelte */}
+            <button
+              onClick={() => setActiveTab('itinerary')}
+              className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer text-center sm:text-left border ${
+                activeTab === 'itinerary' 
+                  ? 'bg-amber-600 text-white font-semibold shadow-xs border-amber-700 ring-2 ring-amber-600/20' 
+                  : 'text-amber-900 hover:text-amber-950 hover:bg-amber-100/70 bg-amber-50/80 border-amber-200/70'
+              }`}
+            >
+              <div className={`p-1.5 rounded-lg shrink-0 ${activeTab === 'itinerary' ? 'bg-white/15' : 'bg-amber-100 text-amber-800'}`}>
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+              <div className="leading-tight">
+                <div className="flex items-center justify-center sm:justify-start gap-1">
+                  <span className="block text-xs font-semibold">Riepilogo</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'itinerary' ? 'bg-white text-amber-800' : 'bg-amber-700 text-white'}`}>
+                    {selectedExperienceIds.length + selectedServiceIds.length + (wantsHotel ? 1 : 0) + (wantsTransfer ? 1 : 0)}
+                  </span>
+                </div>
+                <span className={`text-[10px] hidden sm:block ${activeTab === 'itinerary' ? 'text-amber-100' : 'text-amber-700'}`}>
+                  €{calculateTotalDue()} saldo
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -708,6 +1079,56 @@ export default function GuestPortal({
                           <span>{h.address}</span>
                         </p>
                         <p className="text-xs text-neutral-600 italic">{h.distanceToVenue}</p>
+                        {h.websiteUrl && (
+                          <div className="pt-2 border-t border-neutral-100 flex flex-wrap items-center gap-2">
+                            <a 
+                              href={h.websiteUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200"
+                            >
+                              <span>Booking Engine Ufficiale</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedHotelId(h.id);
+                                handleQueryBookingEngine(h);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-800 hover:text-black bg-neutral-100 px-2.5 py-1 rounded-md border border-neutral-200 cursor-pointer"
+                            >
+                              <Calculator className="w-3 h-3 text-neutral-600" />
+                              <span>Calcolo Rapido Prezzo</span>
+                            </button>
+                          </div>
+                        )}
+                        {!h.websiteUrl && (
+                          <div className="pt-2 border-t border-neutral-100 flex flex-wrap items-center gap-2">
+                            <a 
+                              href={`https://www.booking.com/searchresults.it.html?ss=${encodeURIComponent(h.name)}`}
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-800 hover:text-sky-950 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200"
+                            >
+                              <span>Verifica su Booking.com</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedHotelId(h.id);
+                                handleQueryBookingEngine(h);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-800 hover:text-black bg-neutral-100 px-2.5 py-1 rounded-md border border-neutral-200 cursor-pointer"
+                            >
+                              <Calculator className="w-3 h-3 text-neutral-600" />
+                              <span>Calcolo Rapido Booking.com</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Scelta Tipologia Camere */}
@@ -735,38 +1156,162 @@ export default function GuestPortal({
                 })}
               </div>
 
-              {/* Date di Soggiorno */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-neutral-200 text-xs">
-                <div>
-                  <label className="block text-neutral-700 font-semibold mb-1">Data Check-In</label>
-                  <input
-                    type="date"
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
-                  />
+              {/* Date di Soggiorno & Calcolatore Rapido Booking Engine */}
+              <div className="p-5 rounded-2xl bg-neutral-50/80 border border-neutral-200/90 space-y-4 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
+                  <div>
+                    <span className="font-bold text-neutral-900 flex items-center gap-1.5 text-sm">
+                      <Calculator className="w-4 h-4 text-emerald-700" />
+                      <span>Calcolo Rapido Costo Camera & Interrogazione Booking Engine</span>
+                    </span>
+                    <p className="text-neutral-500 text-[11px] mt-0.5">
+                      Specifica numero di ospiti e periodo: il sistema interroga il booking engine della struttura (o Booking.com) ed elabora il preventivo in tempo reale con facoltà di opzionare la struttura.
+                    </p>
+                  </div>
+                  {currentHotel && (
+                    <span className="text-[11px] font-semibold text-neutral-700 bg-white px-2.5 py-1 rounded-lg border border-neutral-200 shrink-0">
+                      Hotel Selezionato: <strong>{currentHotel.name}</strong>
+                    </span>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-neutral-700 font-semibold mb-1">Data Check-Out</label>
-                  <input
-                    type="date"
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div>
+                    <label className="block text-neutral-700 font-semibold mb-1">Check-In</label>
+                    <input
+                      type="date"
+                      value={checkIn}
+                      onChange={(e) => setCheckIn(e.target.value)}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-semibold mb-1">Check-Out</label>
+                    <input
+                      type="date"
+                      value={checkOut}
+                      onChange={(e) => setCheckOut(e.target.value)}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-semibold mb-1">Adulti</label>
+                    <select
+                      value={calcAdults}
+                      onChange={(e) => setCalcAdults(Number(e.target.value))}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map(num => (
+                        <option key={num} value={num}>{num} Adult{num === 1 ? 'o' : 'i'}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-neutral-700 font-semibold mb-1">Ragazzi / Bambini</label>
+                    <select
+                      value={calcChildren}
+                      onChange={(e) => setCalcChildren(Number(e.target.value))}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
+                    >
+                      {[0, 1, 2, 3, 4].map(num => (
+                        <option key={num} value={num}>{num} Ragazz{num === 1 ? 'o' : 'i'}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      disabled={isQueryingBookingEngine || !currentHotel}
+                      onClick={() => currentHotel && handleQueryBookingEngine(currentHotel)}
+                      className="w-full py-2 px-3 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg shadow-2xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isQueryingBookingEngine ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Interrogazione...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Calculator className="w-3.5 h-3.5" />
+                          <span>Interroga Booking Engine</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="sm:col-span-2">
+                {/* Box Risultato Preventivo & Disponibilità Booking Engine */}
+                {calculatedQuote && (
+                  <div className="p-4 rounded-xl bg-white border-2 border-emerald-600/60 shadow-xs space-y-3 mt-3 animate-fade-in">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span className="font-bold text-neutral-900 text-xs">
+                          Disponibilità Verificata: {calculatedQuote.hotelName} ({calculatedQuote.sourceName})
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Tariffa Garantita Convenzionata Nozze
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-neutral-500 block text-[11px]">Durata:</span>
+                        <strong className="text-neutral-900">{calculatedQuote.nights} Notti</strong>
+                        <span className="text-[10px] text-neutral-400 block">({checkIn} → {checkOut})</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-500 block text-[11px]">Ospiti:</span>
+                        <strong className="text-neutral-900">{calcAdults} Adulti, {calcChildren} Ragazzi</strong>
+                      </div>
+                      <div>
+                        <span className="text-neutral-500 block text-[11px]">Costo per Notte:</span>
+                        <strong className="text-neutral-900">€{calculatedQuote.pricePerNight}</strong>
+                      </div>
+                      <div>
+                        <span className="text-neutral-500 block text-[11px]">Totale Preventivato:</span>
+                        <strong className="text-emerald-700 text-sm font-mono">€{calculatedQuote.totalAmount}</strong>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-neutral-100">
+                      <a
+                        href={calculatedQuote.directBookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-neutral-700 hover:text-neutral-900 underline"
+                      >
+                        <span>Apri pagina prenotazione esterna ({calculatedQuote.sourceName})</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleSelectCalculatedQuote}
+                        className="w-full sm:w-auto px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Opziona Questa Struttura nel Riepilogo</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2">
                   <label className="block text-neutral-700 font-semibold mb-1">
-                    Richieste Speciali per l'Hotel
+                    Richieste Speciali per l'Hotel (Note camera, culla, arrivo tardivo...)
                   </label>
                   <input
                     type="text"
                     value={hotelSpecialRequests}
                     onChange={(e) => setHotelSpecialRequests(e.target.value)}
-                    placeholder="Es. Letto matrimoniale, culla per bebè, arrivo tardivo..."
-                    className="w-full p-2 bg-neutral-50 border border-neutral-300 rounded focus:outline-hidden"
+                    placeholder="Es. Letto matrimoniale, culla per bebè, piano alto, arrivo serale..."
+                    className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -1246,167 +1791,345 @@ export default function GuestPortal({
       )}
 
       {/* ========================================================================= */}
-      {/* SEZIONE 7: RIEPILOGO, VOUCHER & TEST DI INVIO EMAIL                      */}
+      {/* SEZIONE 7: RIEPILOGO, SCHEDA SCELTE CONFERMATE & GESTIONE RESTRIZIONI    */}
       {/* ========================================================================= */}
       {activeTab === 'itinerary' && (
-        <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 pb-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Riepilogo Scelte & Voucher di Soggiorno</span>
-              </div>
-              <h2 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1">
-                Itinerario per {guestInfo.name}
-              </h2>
-            </div>
-
-            <div className="text-right">
-              <div className="text-[11px] text-neutral-400 uppercase tracking-wider">Codice Voucher</div>
-              <div className="text-sm font-mono font-bold text-neutral-900">
-                {weddingData.weddingCode}-{guestInfo.name.substring(0, 3).toUpperCase()}
-              </div>
-            </div>
-          </div>
-
-          {/* Dettagli Selezionati */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            {/* 1. Alloggio */}
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
-              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Alloggio</span>
-              </span>
-              <div className="text-sm font-bold text-neutral-900">
-                {wantsHotel && currentHotel ? currentHotel.name : 'Nessun hotel convenzionato'}
-              </div>
-              {wantsHotel && currentHotel ? (
-                <>
-                  <div className="text-neutral-600">{selectedRoomTypeName}</div>
-                  <div className="text-neutral-500 text-[11px] pt-1">
-                    Check-in: {checkIn} · Check-out: {checkOut}
+        <div className="space-y-6">
+          {/* Se l'ospite ha già una scheda confermata, mostra la Scheda Opzioni Scelte con restrizioni admin */}
+          {confirmedBookingCard && (
+            <div className="border-2 border-emerald-600 rounded-2xl p-6 sm:p-8 bg-white shadow-md space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Scheda Opzioni Scelte & Confermate</span>
+                    </span>
+                    <span className="text-[11px] text-neutral-400">
+                      ID: {confirmedBookingCard.id} · Confermato il {confirmedBookingCard.confirmedAt}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="text-neutral-500 italic">Hai scelto di alloggiare in autonomia.</div>
-              )}
-            </div>
+                  <h2 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1.5">
+                    Riepilogo Scelte Ufficiale per {guestInfo.name}
+                  </h2>
+                </div>
 
-            {/* 2. Trasferimento */}
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
-              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Car className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Trasferimento</span>
-              </span>
-              <div className="text-sm font-bold text-neutral-900">
-                {wantsTransfer && currentTransfer ? currentTransfer.title : 'Nessun transfer richiesto'}
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    confirmedBookingCard.status === 'CONFERMATO' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                    confirmedBookingCard.status === 'MODIFICATO' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    'bg-neutral-100 text-neutral-700'
+                  }`}>
+                    Stato: {confirmedBookingCard.status}
+                  </span>
+                </div>
               </div>
-              {wantsTransfer && currentTransfer ? (
-                <>
-                  <div className="text-neutral-600 font-mono">Volo: {flightNumber}</div>
-                  <div className="text-neutral-500 text-[11px] pt-1">
-                    Arrivo: {flightArrivalDate} · {luggageCount} Valigie
+
+              {/* Elenco Servizi Scelti con Restrizioni Imposte dall'Amministratore */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                  Voci Prenotate & Condizioni di Modifica/Cancellazione:
+                </h3>
+
+                {confirmedBookingCard.items.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-neutral-500 bg-neutral-50 rounded-xl border border-neutral-200">
+                    Tutte le scelte precedenti sono state annullate o rimosse. Puoi selezionare nuovi servizi dalle schede dedicate.
                   </div>
-                </>
-              ) : (
-                <div className="text-neutral-500 italic">Ti sposterai in autonomia.</div>
-              )}
-            </div>
+                ) : (
+                  confirmedBookingCard.items.map((item, idx) => (
+                    <div key={idx} className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-2 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-neutral-200 text-neutral-600 mr-2">
+                            {item.category}
+                          </span>
+                          <strong className="text-sm text-neutral-900">{item.title}</strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-neutral-900">
+                            {item.freeByCouple ? 'Gratuito (Regalo Sposi)' : `€${item.cost}`}
+                          </span>
+                        </div>
+                      </div>
 
-            {/* 3. Esperienze & Servizi */}
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
-              <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-neutral-600" />
-                <span>Attività & Servizi ({selectedExperienceIds.length + selectedServiceIds.length})</span>
-              </span>
-              <div className="space-y-0.5 text-neutral-700 pt-1">
-                {selectedExperienceIds.map(id => {
-                  const exp = weddingData.experiences.find(e => e.id === id);
-                  return exp ? (
-                    <div key={id} className="flex justify-between items-center text-[11px]">
-                      <span>• {exp.title}</span>
-                      <span className="font-bold text-neutral-900">
-                        {exp.isHostSponsored ? 'Gratuito (Sposi)' : `€${exp.pricePerPerson}`}
-                      </span>
+                      <p className="text-neutral-600 text-[11px]">{item.details}</p>
+
+                      {/* Box Restrizioni Imposte dall'Amministratore */}
+                      <div className="p-2.5 bg-amber-50/80 rounded-lg border border-amber-200/70 text-[11px] text-amber-900 flex items-start gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <span className="font-semibold">{item.cancellationPolicy}</span>
+                        </div>
+                      </div>
+
+                      {/* Azioni per Voce (Cambia, Annulla, Regole) */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200/60">
+                        <span className="text-[10px] text-neutral-400">
+                          Termine ultimo policy: {item.deadlineDate}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (item.category === 'HOTEL') setActiveTab('hotels');
+                              else if (item.category === 'TRANSFER') setActiveTab('transfers');
+                              else if (item.category === 'EXPERIENCE') setActiveTab('experiences');
+                              else setActiveTab('services');
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:text-black bg-white rounded border border-neutral-300 hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Cambia</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCancelConfirmedItem(item.category, item.title)}
+                            className="px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:text-rose-900 bg-rose-50 rounded border border-rose-200 hover:bg-rose-100 cursor-pointer flex items-center gap-1"
+                          >
+                            <XCircle className="w-3 h-3" />
+                            <span>Annulla Servizio</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  ) : null;
-                })}
-
-                {selectedServiceIds.map(id => {
-                  const srv = weddingData.extraServices.find(s => s.id === id);
-                  return srv ? (
-                    <div key={id} className="flex justify-between items-center text-[11px]">
-                      <span>• {srv.title}</span>
-                      <span className="font-bold text-neutral-900">€{srv.price}</span>
-                    </div>
-                  ) : null;
-                })}
+                  ))
+                )}
               </div>
-            </div>
-          </div>
 
-          {/* Riepilogo Costi per i Servizi a Pagamento */}
-          <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div>
-              <span className="text-neutral-500 block">Totale Servizi Selezionati a Pagamento:</span>
-              <span className="text-lg font-mono font-bold text-neutral-900">
-                €{calculateTotalDue()}
-              </span>
-              <span className="text-[11px] text-neutral-500 ml-2">
-                (Le esperienze offerte dagli sposi sono completamente gratuite)
-              </span>
-            </div>
+              {/* Azioni Globali Scheda (Aggiungi Servizi, Riconferma, Stampa) */}
+              <div className="p-4 rounded-xl bg-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="text-neutral-500 block text-[11px]">Totale Saldo Servizi Selezionati:</span>
+                  <span className="text-lg font-mono font-bold text-neutral-900">
+                    €{calculateTotalDue()}
+                  </span>
+                </div>
 
-            <div className="text-right text-[11px] text-neutral-500">
-              Riceverai le istruzioni di pagamento via email dall'amministrazione AD Marketing.
-            </div>
-          </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('experiences')}
+                    className="px-3 py-2 text-xs font-semibold text-neutral-800 bg-white hover:bg-neutral-50 rounded-xl border border-neutral-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Aggiungi Altri Servizi / Esperienze</span>
+                  </button>
 
-          {/* Risultato Test Invio Email */}
-          {emailSentStatus && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
-              <div className="flex items-center gap-2 font-bold text-emerald-950">
-                <MailCheck className="w-4 h-4 text-emerald-700" />
-                <span>Test Invio Email Riuscito alle ore {emailSentStatus.timestamp}</span>
-              </div>
-              <p>{emailSentStatus.message}</p>
-              <div className="text-[11px] text-emerald-800 font-mono">
-                Destinatario Ospite: {guestInfo.email} | Copia Amministrazione: {adminNotificationEmail}
+                  <button
+                    type="button"
+                    onClick={handleConfirmAndSendChoices}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Aggiorna & Re-Invia Scheda Opzioni</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Azioni Stampa & Invio Email */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-neutral-200">
-            <button
-              onClick={() => setActiveTab('hotels')}
-              className="text-xs text-neutral-600 hover:text-neutral-900 font-medium"
-            >
-              ← Modifica le tue selezioni
-            </button>
+          {/* Scheda Riepilogo Standard con Pulsante "Conferma e Invia" */}
+          <div className="border border-neutral-200 rounded-2xl p-6 sm:p-8 bg-white shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Riepilogo Scelte & Voucher di Soggiorno</span>
+                </div>
+                <h2 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-1">
+                  Itinerario per {guestInfo.name}
+                </h2>
+              </div>
 
-            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <div className="text-[11px] text-neutral-400 uppercase tracking-wider">Codice Voucher</div>
+                <div className="text-sm font-mono font-bold text-neutral-900">
+                  {weddingData.weddingCode}-{guestInfo.name.substring(0, 3).toUpperCase()}
+                </div>
+              </div>
+            </div>
+
+            {/* Dettagli Selezionati */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              {/* 1. Alloggio */}
+              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+                <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-neutral-600" />
+                  <span>Alloggio</span>
+                </span>
+                <div className="text-sm font-bold text-neutral-900">
+                  {wantsHotel && currentHotel ? currentHotel.name : 'Nessun hotel convenzionato'}
+                </div>
+                {wantsHotel && currentHotel ? (
+                  <>
+                    <div className="text-neutral-600">{selectedRoomTypeName}</div>
+                    <div className="text-neutral-500 text-[11px] pt-1">
+                      Check-in: {checkIn} · Check-out: {checkOut}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-neutral-500 italic">Hai scelto di alloggiare in autonomia.</div>
+                )}
+              </div>
+
+              {/* 2. Trasferimento */}
+              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+                <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5 text-neutral-600" />
+                  <span>Trasferimento</span>
+                </span>
+                <div className="text-sm font-bold text-neutral-900">
+                  {wantsTransfer && currentTransfer ? currentTransfer.title : 'Nessun transfer richiesto'}
+                </div>
+                {wantsTransfer && currentTransfer ? (
+                  <>
+                    <div className="text-neutral-600 font-mono">Volo: {flightNumber}</div>
+                    <div className="text-neutral-500 text-[11px] pt-1">
+                      Arrivo: {flightArrivalDate} · {luggageCount} Valigie
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-neutral-500 italic">Ti sposterai in autonomia.</div>
+                )}
+              </div>
+
+              {/* 3. Esperienze & Servizi */}
+              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1">
+                <span className="font-semibold text-neutral-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-neutral-600" />
+                  <span>Attività & Servizi ({selectedExperienceIds.length + selectedServiceIds.length})</span>
+                </span>
+                <div className="space-y-0.5 text-neutral-700 pt-1">
+                  {selectedExperienceIds.map(id => {
+                    const exp = weddingData.experiences.find(e => e.id === id);
+                    return exp ? (
+                      <div key={id} className="flex justify-between items-center text-[11px]">
+                        <span>• {exp.title}</span>
+                        <span className="font-bold text-neutral-900">
+                          {exp.isHostSponsored ? 'Gratuito (Sposi)' : `€${exp.pricePerPerson}`}
+                        </span>
+                      </div>
+                    ) : null;
+                  })}
+
+                  {selectedServiceIds.map(id => {
+                    const srv = weddingData.extraServices.find(s => s.id === id);
+                    return srv ? (
+                      <div key={id} className="flex justify-between items-center text-[11px]">
+                        <span>• {srv.title}</span>
+                        <span className="font-bold text-neutral-900">€{srv.price}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Riepilogo Costi per i Servizi a Pagamento */}
+            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="text-neutral-500 block">Totale Servizi Selezionati a Pagamento:</span>
+                <span className="text-lg font-mono font-bold text-neutral-900">
+                  €{calculateTotalDue()}
+                </span>
+                <span className="text-[11px] text-neutral-500 ml-2">
+                  (Le esperienze offerte dagli sposi sono completamente gratuite)
+                </span>
+              </div>
+
+              <div className="text-right text-[11px] text-neutral-500">
+                Riceverai le istruzioni di pagamento via email dall'amministrazione AD Marketing.
+              </div>
+            </div>
+
+            {/* Risultato Test Invio Email */}
+            {emailSentStatus && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-emerald-950">
+                  <MailCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Test Invio Email Riuscito alle ore {emailSentStatus.timestamp}</span>
+                </div>
+                <p>{emailSentStatus.message}</p>
+                <div className="text-[11px] text-emerald-800 font-mono">
+                  Destinatario Ospite: {guestInfo.email} | Copia Amministrazione: {adminNotificationEmail}
+                </div>
+              </div>
+            )}
+
+            {/* Azioni: Pulsante "Conferma e Invia" + Stampa & Modifica */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-neutral-200">
               <button
-                type="button"
-                onClick={handlePrintVoucher}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors cursor-pointer"
+                onClick={() => setActiveTab('hotels')}
+                className="text-xs text-neutral-600 hover:text-neutral-900 font-medium"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Stampa Voucher</span>
+                ← Torna alle sezioni per modificare
               </button>
 
-              <button
-                type="button"
-                onClick={handleSendVoucherEmail}
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Invia Voucher via Email (Test di Invio)</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintVoucher}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Stampa Riepilogo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmAndSendChoices}
+                  className="flex items-center gap-2 px-6 py-2.5 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Conferma e Invia Scelte</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Finestra di Riepilogo Sempre Attiva in Basso (Carrello della spesa in tempo reale) */}
+      <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-neutral-300 p-3 sm:p-4 shadow-2xl z-50 flex items-center justify-between md:px-8">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0">
+            <ShoppingCart className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[11px] text-neutral-500">
+              Riepilogo Scelte in Tempo Reale:
+            </div>
+            <div className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+              <span>Totale a Saldo:</span>
+              <span className="font-mono text-emerald-800 text-base">€{calculateTotalDue()}</span>
+              <span className="text-[11px] font-normal text-neutral-500 hidden sm:inline">
+                ({selectedExperienceIds.length + selectedServiceIds.length + (wantsHotel ? 1 : 0) + (wantsTransfer ? 1 : 0)} voci selezionate)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {activeTab !== 'itinerary' && (
+            <button
+              onClick={() => setActiveTab('itinerary')}
+              className="px-4 py-2 text-xs font-semibold text-neutral-800 hover:text-black bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors cursor-pointer"
+            >
+              Vedi Riepilogo
+            </button>
+          )}
+
+          <button 
+            onClick={handleConfirmAndSendChoices} 
+            className="px-4 sm:px-6 py-2 text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer bg-emerald-800 hover:bg-emerald-900 text-white flex items-center gap-1.5"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Conferma e Invia</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

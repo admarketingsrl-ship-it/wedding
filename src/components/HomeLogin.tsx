@@ -281,10 +281,103 @@ export default function HomeLogin({
       )}
 
       {/* ========================================================================= */}
-      {/* SEZIONE PRINCIPALE ESPLOSA: ACCESSO OSPITI                                */}
-      {/* (Oppure login Sposi / Agenzia / Fornitori se selezionati)                */}
+      {/* SELETTORE AREE DI ACCESSO: MENU A PULSANTI ADATTIVO E RESPONSIVE         */}
+      {/* (Nessuno scorrimento orizzontale, 100% responsive e carino per smartphone) */}
       {/* ========================================================================= */}
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center sm:text-left mb-2">
+          <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+            Seleziona la tua area di accesso:
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {/* 1. Ospiti */}
+          <button
+            type="button"
+            onClick={() => setActiveRole('guest')}
+            className={`flex items-center gap-2.5 p-3 rounded-2xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeRole === 'guest'
+                ? 'bg-amber-900 text-white font-semibold shadow-xs border-amber-950 ring-2 ring-amber-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${activeRole === 'guest' ? 'bg-white/15 text-amber-200' : 'bg-amber-100 text-amber-800'}`}>
+              <Globe className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-bold truncate">Ospiti & Invitati</span>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeRole === 'guest' ? 'text-amber-200' : 'text-neutral-500'}`}>
+                Accesso con Codice
+              </span>
+            </div>
+          </button>
 
+          {/* 2. Sposi */}
+          <button
+            type="button"
+            onClick={() => setActiveRole('couple')}
+            className={`flex items-center gap-2.5 p-3 rounded-2xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeRole === 'couple'
+                ? 'bg-rose-900 text-white font-semibold shadow-xs border-rose-950 ring-2 ring-rose-900/20'
+                : 'text-neutral-700 hover:text-rose-900 hover:bg-rose-50/50 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${activeRole === 'couple' ? 'bg-white/15 text-rose-200' : 'bg-rose-100 text-rose-700'}`}>
+              <Heart className="w-4 h-4 fill-current" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-bold truncate">Futuri Sposi</span>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeRole === 'couple' ? 'text-rose-200' : 'text-neutral-500'}`}>
+                Area Coppia Nozze
+              </span>
+            </div>
+          </button>
+
+          {/* 3. Agenzia */}
+          <button
+            type="button"
+            onClick={() => setActiveRole('admin')}
+            className={`flex items-center gap-2.5 p-3 rounded-2xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeRole === 'admin'
+                ? 'bg-neutral-900 text-white font-semibold shadow-xs border-black ring-2 ring-neutral-900/20'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${activeRole === 'admin' ? 'bg-white/15 text-neutral-200' : 'bg-neutral-100 text-neutral-700'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-bold truncate">Staff Agenzia</span>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeRole === 'admin' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                AD Marketing Back End
+              </span>
+            </div>
+          </button>
+
+          {/* 4. Fornitori */}
+          <button
+            type="button"
+            onClick={() => setActiveRole('supplier')}
+            className={`flex items-center gap-2.5 p-3 rounded-2xl text-left transition-all active:scale-95 cursor-pointer border ${
+              activeRole === 'supplier'
+                ? 'bg-purple-900 text-white font-semibold shadow-xs border-purple-950 ring-2 ring-purple-900/20'
+                : 'text-neutral-700 hover:text-purple-900 hover:bg-purple-50/50 bg-white border-neutral-200 shadow-2xs'
+            }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${activeRole === 'supplier' ? 'bg-white/15 text-purple-200' : 'bg-purple-100 text-purple-800'}`}>
+              <Package className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-xs font-bold truncate">Fornitori Partner</span>
+              <span className={`text-[10px] block mt-0.5 truncate ${activeRole === 'supplier' ? 'text-purple-200' : 'text-neutral-500'}`}>
+                Credenziali Private
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
       {/* SEZIONE 1: ACCESSO OSPITI (ESPLOSA COME PRINCIPALE) */}
       {activeRole === 'guest' && (
         <section className="bg-white border-2 border-amber-900/30 rounded-3xl p-6 sm:p-10 shadow-xl space-y-6 max-w-4xl mx-auto relative transition-all">
