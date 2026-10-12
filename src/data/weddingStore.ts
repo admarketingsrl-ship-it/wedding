@@ -9,6 +9,7 @@ export interface RoomTypeItem {
   totalBlocked: number;
   availableRooms: number;
   maxOccupancy: number;
+  description?: string;
 }
 
 export interface HotelItem {
@@ -17,7 +18,7 @@ export interface HotelItem {
   stars: number;
   address: string;
   distanceToVenue: string;
-  negotiatedRate: number;
+  negotiatedRate: number; // Prezzo base di riferimento stabilito dall'agenzia
   currency: string;
   roomTypes: RoomTypeItem[];
   bookingDeadline: string;
@@ -25,7 +26,11 @@ export interface HotelItem {
   supplierId?: string;
   image?: string;
   negotiatedPerk?: string; // Dettaglio speciale "Negoziato per voi" dall'agenzia
-  websiteUrl?: string; // Nuova: Collegamento al booking engine della struttura
+  websiteUrl?: string; // Collegamento al booking engine della struttura
+  bookingEngineType?: 'DIRECT_ENGINE' | 'BOOKING_COM' | 'INTERNAL_PMS';
+  amenities?: string[];
+  agencyPricingNotes?: string; // Note e criteri di valutazione giorni/tariffe inserite dall'agenzia
+  pricingManagedByAgency?: boolean;
 }
 
 export interface TransferItem {
@@ -94,6 +99,15 @@ export interface GuestItem {
   totalAmountDue: number; // Totale da pagare per i servizi non offerti dagli sposi
   paymentStatus: 'PAID' | 'PENDING' | 'FREE';
   registeredAt: string;
+  // Dettagli Soggiorno Hotel & Quotazione Agenzia
+  checkInDate?: string;
+  checkOutDate?: string;
+  hotelNights?: number;
+  hotelEstimatePrice?: number; // Prima ipotesi calcolata in base alla tariffa agenzia
+  hotelOfficialPrice?: number; // Quotazione ufficiale confermata dall'agenzia
+  hotelBookingStatus?: 'NONE' | 'QUOTE_REQUESTED' | 'OFFICIAL_CONFIRMED' | 'PAID';
+  hotelSpecialRequests?: string;
+  hotelPaymentSentAt?: string;
 }
 
 // Richieste su misura / desideri dell'ospite da impacchettare in proposta
@@ -142,6 +156,13 @@ export interface MasterSupplier {
   accessPassword?: string; // Password di accesso assegnata dall'agenzia
   welcomeEmailSent?: boolean; // Stato invio email con credenziali e link
   emailSentAt?: string; // Data e ora invio email con credenziali
+  websiteUrl?: string; // Link diretto al booking engine della struttura o booking.com
+  bookingEngineType?: 'DIRECT_ENGINE' | 'BOOKING_COM' | 'INTERNAL_PMS';
+  address?: string;
+  distanceToVenue?: string;
+  roomTypes?: RoomTypeItem[];
+  amenities?: string[];
+  negotiatedPerk?: string;
 }
 
 // Richieste degli sposi per regalare servizi agli ospiti
@@ -207,6 +228,14 @@ export interface SupplierBookingOrder {
   paymentNotes?: string;
   emailSentToSupplierAt: string;
   supplierResponseDate?: string;
+  // Dettagli specifici per Hotel & Valutazione Agenzia
+  roomType?: string;
+  checkIn?: string;
+  checkOut?: string;
+  nights?: number;
+  isHotelEstimate?: boolean;
+  officialQuotedPrice?: number;
+  officialConfirmationSentAt?: string;
 }
 
 // Richieste di pagamento generate dall'amministrazione
@@ -321,15 +350,19 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     category: 'HOTEL',
     stars: 5,
     city: 'Savelletri di Fasano (BR)',
+    address: 'Contrada Losciale, Fasano (BR)',
     contactPerson: 'Dott.ssa Marisa Greco',
     email: 'booking@borgoegnazia.it',
     phone: '+39 080 225500',
     standardRate: 520,
     commissionPercent: 12,
+    websiteUrl: 'https://www.borgoegnazia.it/prenotazioni',
+    bookingEngineType: 'DIRECT_ENGINE',
     notes: 'Partner gold per matrimoni esteri di lusso. Camere e ville private.',
     accessPassword: 'fornitore2026',
     welcomeEmailSent: true,
-    emailSentAt: '2026-08-10 11:30'
+    emailSentAt: '2026-08-10 11:30',
+    amenities: ['Piscina scoperta', 'Spa Vair', 'Campo Golf 18 buche', 'Spiaggia privata Cala Masciola', 'Colazione pugliese inclusa']
   },
   {
     id: 'sup-masseria-torre',
@@ -337,15 +370,19 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     category: 'HOTEL',
     stars: 5,
     city: 'Fasano (BR)',
+    address: 'C.da Coccaro 8, Savelletri di Fasano (BR)',
     contactPerson: 'Vincenzo Muolo',
     email: 'events@torrecoccaro.com',
     phone: '+39 080 4829310',
     standardRate: 460,
     commissionPercent: 15,
+    websiteUrl: 'https://www.torrecoccaro.com/booking',
+    bookingEngineType: 'DIRECT_ENGINE',
     notes: 'Masseria cinquecentesca tra gli ulivi, spiaggia privata Coccaro Beach Club.',
     accessPassword: 'fornitore2026',
     welcomeEmailSent: true,
-    emailSentAt: '2026-08-12 14:15'
+    emailSentAt: '2026-08-12 14:15',
+    amenities: ['Spiaggia privata Coccaro Beach Club', 'Piscina riscaldata', 'Aveda Spa in grotta', 'Navetta gratuita per la cerimonia']
   },
   {
     id: 'sup-masseria-san-domenico',
@@ -353,15 +390,19 @@ export const INITIAL_SUPPLIERS: MasterSupplier[] = [
     category: 'HOTEL',
     stars: 5,
     city: 'Savelletri (BR)',
+    address: 'Strada Provinciale 90, Fasano (BR)',
     contactPerson: 'Silvia Melpignano',
     email: 'concierge@masseriasandomenico.com',
     phone: '+39 080 4827777',
     standardRate: 490,
     commissionPercent: 12,
+    websiteUrl: 'https://www.masseriasandomenico.com/booking',
+    bookingEngineType: 'DIRECT_ENGINE',
     notes: 'Dimora storica fortificata del XIV secolo, talassoterapia e campo golf 18 buche.',
     accessPassword: 'fornitore2026',
     welcomeEmailSent: true,
-    emailSentAt: '2026-08-15 09:45'
+    emailSentAt: '2026-08-15 09:45',
+    amenities: ['Centro Talassoterapia', 'Piscina con acqua di mare', 'Ristorante gourmet', 'San Domenico Golf Club']
   },
   {
     id: 'sup-ncc-puglia',
@@ -504,6 +545,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         image: hotelSuiteImg,
         websiteUrl: 'https://www.borgoegnazia.it/prenotazioni',
         negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Bottiglia di Primitivo di Manduria DOC in camera all\'arrivo e Late Check-Out ore 13:00 garantito.',
+        agencyPricingNotes: 'Tariffa convenzionata nozze concordata da AD Marketing. Minimo 2 notti per il weekend delle celebrazioni. Prima colazione e spa incluse.',
+        pricingManagedByAgency: true,
         roomTypes: [
           {
             id: 'rt-puglia-1',
@@ -537,6 +580,8 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         image: heroBanner,
         websiteUrl: 'https://www.torrecoccaro.com/booking',
         negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Accesso gratuito alla spiaggia privata Coccaro Beach Club con lettino e telo mare inclusi.',
+        agencyPricingNotes: 'Tariffa concordata per il blocco nozze. Valutazione agenzia: tariffa fissa con navetta cerimoniale inclusa.',
+        pricingManagedByAgency: true,
         roomTypes: [
           {
             id: 'rt-puglia-3',
@@ -545,6 +590,42 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
             totalBlocked: 30,
             availableRooms: 14,
             maxOccupancy: 2
+          }
+        ]
+      },
+      {
+        id: 'hotel-puglia-3',
+        name: 'Masseria San Domenico (5★ Lusso)',
+        stars: 5,
+        address: 'Strada Provinciale 90, Savelletri di Fasano (BR)',
+        distanceToVenue: '8 min con navetta dedicata',
+        negotiatedRate: 490,
+        currency: 'EUR',
+        bookingDeadline: '2026-07-20',
+        groupCode: 'SAN-DOMENICO-WED',
+        supplierId: 'sup-masseria-san-domenico',
+        image: hotelSuiteImg,
+        websiteUrl: 'https://www.masseriasandomenico.com/booking',
+        bookingEngineType: 'DIRECT_ENGINE',
+        negotiatedPerk: 'Negoziato per voi dall\'Agenzia: Percorso talassoterapico gratuito di benvenuto e accesso campo golf 18 buche.',
+        agencyPricingNotes: 'Quotazione concordata da AD Marketing in base alle date. Include percorso benessere per tutti gli ospiti del matrimonio.',
+        pricingManagedByAgency: true,
+        roomTypes: [
+          {
+            id: 'rt-puglia-4',
+            name: 'Junior Suite Vista Uliveto',
+            pricePerNight: 490,
+            totalBlocked: 25,
+            availableRooms: 11,
+            maxOccupancy: 2
+          },
+          {
+            id: 'rt-puglia-5',
+            name: 'Suite Tradizionale Fortificata',
+            pricePerNight: 620,
+            totalBlocked: 10,
+            availableRooms: 4,
+            maxOccupancy: 3
           }
         ]
       }
@@ -781,156 +862,6 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
         requestedAt: '2026-08-15 14:30',
         approvedAt: '2026-08-16 10:00',
         agencyNotes: 'Approvato! Tariffa convenzionata bloccata con flotta bus VIP e autisti bilingue.'
-      },
-      {
-        id: 'gift-req-2',
-        weddingCode: 'SOPHIA-LIAM-2026',
-        coupleNames: 'Sophia Rossi & Liam O\'Connor',
-        serviceId: 'exp-puglia-2',
-        serviceTitle: 'Gita in Barca & Calice al Tramonto tra le Grotte di Polignano a Mare',
-        serviceCategory: 'EXPERIENCE',
-        guestsCount: 25,
-        unitPrice: 85,
-        totalEstimatedAmount: 2125,
-        currency: 'EUR',
-        coupleNotes: 'Vorremmo regalare questa escursione al tramonto con calice di benvenuto per i 25 ospiti del nostro wedding party ristretto.',
-        status: 'PENDING_APPROVAL',
-        requestedAt: '2026-09-05 18:20',
-        agencyNotes: 'Preventivo in verifica di disponibilità di 2 gozzi affiancati con Donato Zaccaria.'
-      }
-    ]
-  },
-  {
-    id: 'wed-como-2026',
-    weddingCode: 'EMMA-ALEX-2026',
-    coupleNames: 'Emma Watson & Alexander Sterling',
-    weddingDate: '2026-06-20',
-    venue: 'Villa Balbianello, Tremezzina',
-    city: 'Lago di Como & Puglia',
-    country: 'Italia',
-    bannerImage: heroBanner,
-    welcomeMessage: 'Cari amici, benvenuti in Italia! Siamo felicissimi di festeggiare il nostro matrimonio con voi. Il concierge di Valeria e AD Marketing è a vostra disposizione su Apulian Wedding Concierge per organizzare hotel convenzionati, transfer e gite sul lago.',
-    currency: 'EUR',
-    conciergeEmail: 'concierge@admarketing.it',
-    conciergePhone: '+39 099 8887766',
-    conciergeWhatsApp: '+393401234567',
-    hotels: [
-      {
-        id: 'hotel-como-1',
-        name: 'Grand Hotel Tremezzo (5★ Lusso)',
-        stars: 5,
-        address: 'Via Regina 8, Tremezzina (CO)',
-        distanceToVenue: '8 min water taxi o navetta',
-        negotiatedRate: 490,
-        currency: 'EUR',
-        bookingDeadline: '2026-04-15',
-        groupCode: 'EMMA-ALEX-VIP',
-        image: hotelSuiteImg,
-        roomTypes: [
-          {
-            id: 'rt-como-1',
-            name: 'Prestige Vista Lago',
-            pricePerNight: 490,
-            totalBlocked: 30,
-            availableRooms: 11,
-            maxOccupancy: 2
-          }
-        ]
-      }
-    ],
-    transfers: [
-      {
-        id: 'tr-como-1',
-        type: 'AIRPORT_SHUTTLE',
-        title: 'Navetta Collettiva Milano Malpensa (MXP) → Tremezzo',
-        origin: 'Malpensa T1/T2',
-        destination: 'Hotel Convenzionati',
-        departureTime: '18 Giugno - 11:00 e 15:30',
-        vehicleType: 'Mercedes Sprinter VIP 16 pax',
-        capacity: 16,
-        bookedSeats: 12,
-        pricePerSeat: 45,
-        isPaidByCouple: false
-      },
-      {
-        id: 'tr-como-2',
-        type: 'VENUE_SHUTTLE',
-        title: 'Navetta Motoscafo Ufficiale Cerimonia (A/R)',
-        origin: 'Lobby Hotel',
-        destination: 'Pontile Villa Balbianello',
-        departureTime: '20 Giugno - 15:15 / Ritorno 01:00',
-        vehicleType: 'Motoscafo Privato',
-        capacity: 120,
-        bookedSeats: 105,
-        pricePerSeat: 0,
-        isPaidByCouple: true
-      }
-    ],
-    experiences: [
-      {
-        id: 'exp-como-1',
-        title: 'Welcome Dinner & Pizza Party all\'Aperto',
-        category: 'WELCOME_PARTY',
-        eventDate: '2026-06-19',
-        startTime: '20:30',
-        durationHours: 3,
-        meetingPoint: 'Terrazza Panoramica Bellagio',
-        pricePerPerson: 0,
-        isHostSponsored: true, // OFFERTO DAGLI SPOSI!
-        maxParticipants: 120,
-        bookedParticipants: 110,
-        dressCode: 'Casual Summer Party',
-        description: 'Cena informale con forni a legna per pizza e musica dal vivo offerta con amore dagli sposi.',
-        image: heroBanner
-      },
-      {
-        id: 'exp-como-2',
-        title: 'Sunset Cruise su Motoscafo Riva d\'Epoca & Champagne',
-        category: 'BOAT_TOUR',
-        eventDate: '2026-06-19',
-        startTime: '18:00',
-        durationHours: 2.5,
-        meetingPoint: 'Molo di Tremezzo',
-        pricePerPerson: 110,
-        isHostSponsored: false,
-        maxParticipants: 24,
-        bookedParticipants: 18,
-        dressCode: 'Resort Chic',
-        description: 'Tour privato delle ville storiche del centro lago con calice di champagne al tramonto.',
-        image: boatTourImg
-      }
-    ],
-    extraServices: [
-      {
-        id: 'srv-como-makeup',
-        title: 'Trucco Invitata a Domicilio',
-        category: 'MAKEUP',
-        price: 95,
-        isPaidByCouple: false,
-        duration: '45 min',
-        description: 'Make-up artist in camera prima della partenza per la villa.',
-        providerName: 'Como Beauty Atelier'
-      }
-    ],
-    guests: [
-      {
-        id: 'g-como-1',
-        name: 'Eleanor & Jonathan Vance',
-        email: 'eleanor.vance@nycapital.com',
-        phone: '+1 212 555 0192',
-        country: 'Stati Uniti (New York)',
-        flag: '🇺🇸',
-        hotelBooked: 'Grand Hotel Tremezzo (5★ Lusso)',
-        roomType: 'Prestige Vista Lago',
-        transferBooked: 'Navetta Collettiva Milano Malpensa (MXP)',
-        flight: 'Delta DL112 (08:45)',
-        experiences: ['Welcome Dinner & Pizza Party all\'Aperto', 'Sunset Cruise su Motoscafo Riva d\'Epoca & Champagne'],
-        extraServices: ['Trucco Invitata a Domicilio'],
-        diet: 'Vegetariano',
-        status: 'CONFIRMED',
-        totalAmountDue: 250,
-        paymentStatus: 'PAID',
-        registeredAt: '2026-10-01'
       }
     ]
   }
@@ -953,20 +884,6 @@ export const INITIAL_WISH_REQUESTS: TouristWishRequest[] = [
     agencyNotes: 'Contattato fornitore Vintage Apulia Moto a Martina Franca. Disponibile Vespa PX 125 color crema con consegna in masseria a €160/giorno inclusa assicurazione kasko.',
     proposedCost: 160,
     createdAt: '2026-10-05 14:22'
-  },
-  {
-    id: 'wish-2',
-    weddingCode: 'SOPHIA-LIAM-2026',
-    guestName: 'Aidan Murphy',
-    guestEmail: 'aidan.murphy@dublin.ie',
-    title: 'Passeggiata a cavallo al tramonto sulla spiaggia di Torre Canne',
-    description: 'I nostri due ragazzi adorano i cavalli. Ci piacerebbe organizzare un\'escursione di 2 ore tra gli ulivi e sulla spiaggia sabbiosa al calar del sole il 13 Settembre.',
-    preferredDate: '2026-09-13',
-    participantsCount: 4,
-    budgetRange: '€200 - €350',
-    status: 'RECEIVED',
-    agencyNotes: 'In attesa di conferma disponibilità dal Maneggio San Domenico.',
-    createdAt: '2026-10-06 09:15'
   }
 ];
 
@@ -1171,10 +1088,11 @@ export const INITIAL_SUPPLIER_BOOKINGS: SupplierBookingOrder[] = [
   }
 ];
 
-// Credenziali amministrative provvisorie per l'accesso Agenzia
+// Credenziali amministrative per l'accesso Agenzia AD Marketing
 export const ADMIN_CREDENTIALS = {
-  email: 'admin@weddingconcierge.it',
-  password: 'WeddingAdmin2026!',
-  name: 'Elena Baroni & Valeria (Team Concierge AD Marketing)',
+  email: 'info@admarketing.it',
+  alternativeEmail: 'admin@weddingconcierge.it',
+  password: 'admin2026',
+  name: 'Staff Concierge AD Marketing (Valeria)',
   role: 'CHIEF_CONCIERGE'
 };

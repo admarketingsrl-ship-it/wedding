@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Building2, 
   Car, 
@@ -25,13 +25,20 @@ import {
   DollarSign,
   Tag,
   Scissors,
-  Users
+  Users,
+  Lock,
+  Sliders,
+  Bed,
+  X,
+  Trash2,
+  Info
 } from 'lucide-react';
 import { 
   MasterSupplier, 
   SupplierPackage, 
   SupplierBookingOrder,
-  WeddingData
+  WeddingData,
+  RoomTypeItem
 } from '../data/weddingStore';
 import hotelSuiteImg from '../assets/images/wedding_hotel_suite_1791309120679.jpg';
 import boatTourImg from '../assets/images/wedding_boat_experience_1791309131765.jpg';
@@ -47,6 +54,8 @@ interface SupplierPortalProps {
   bookingOrders: SupplierBookingOrder[];
   onUpdateBookingOrders: (orders: SupplierBookingOrder[]) => void;
   weddings: WeddingData[];
+  onUpdateWeddings?: (weddings: WeddingData[]) => void;
+  onUpdateSuppliers?: (suppliers: MasterSupplier[]) => void;
   onLogout: () => void;
   onNavigateToAgency: () => void;
 }
@@ -60,6 +69,8 @@ export default function SupplierPortal({
   bookingOrders,
   onUpdateBookingOrders,
   weddings,
+  onUpdateWeddings,
+  onUpdateSuppliers,
   onLogout,
   onNavigateToAgency
 }: SupplierPortalProps) {
@@ -98,6 +109,132 @@ export default function SupplierPortal({
   const [paymentChoice, setPaymentChoice] = useState<'DIRECT_AT_CHECKIN' | 'SUPPLIER_BANK_TRANSFER' | 'SUPPLIER_PAYMENT_LINK' | 'AGENCY_CENTRAL_BILLING'>('DIRECT_AT_CHECKIN');
   const [paymentCustomNotes, setPaymentCustomNotes] = useState('');
   const [notificationSentSuccess, setNotificationSentSuccess] = useState<string | null>(null);
+
+  // =========================================================================
+  // STATO E GESTIONE SCHEDA STRUTTURA PER FORNITORI HOTEL
+  // "la struttura ha solo la possibilità di compilare la scheda con tutti i dettagli,
+  // il prezzo di riferimento sarà inserito dall'agenzia"
+  // =========================================================================
+  const isHotelSupplier = currentSupplier?.category === 'HOTEL';
+  const matchingHotel = weddings.flatMap(w => w.hotels).find(h => 
+    h.supplierId === currentSupplier?.id || 
+    h.name.toLowerCase().includes((currentSupplier?.name || '').toLowerCase().substring(0, 8))
+  );
+
+  const [hotelName, setHotelName] = useState(matchingHotel?.name || currentSupplier?.name || '');
+  const [hotelStars, setHotelStars] = useState(matchingHotel?.stars || 5);
+  const [hotelAddress, setHotelAddress] = useState(matchingHotel?.address || `${currentSupplier?.city || 'Fasano'}, Puglia`);
+  const [hotelCity, setHotelCity] = useState(currentSupplier?.city || 'Fasano (BR)');
+  const [hotelContact, setHotelContact] = useState(currentSupplier?.contactPerson || 'Direzione Hotel');
+  const [hotelPhone, setHotelPhone] = useState(currentSupplier?.phone || '+39 080 1234567');
+  const [hotelEmail, setHotelEmail] = useState(currentSupplier?.email || '');
+  const [hotelWebsiteUrl, setHotelWebsiteUrl] = useState(matchingHotel?.websiteUrl || '');
+  const [hotelDistance, setHotelDistance] = useState(matchingHotel?.distanceToVenue || 'Sede ricevimento o pochi minuti');
+  const [hotelPerk, setHotelPerk] = useState(matchingHotel?.negotiatedPerk || 'Bottiglia di benvenuto e late check-out');
+  const [hotelDescription, setHotelDescription] = useState(currentSupplier?.notes || 'Antica dimora con piscina a sfioro, centro benessere SPA, colazione pugliese con prodotti a km 0.');
+  const [hotelRoomTypes, setHotelRoomTypes] = useState<RoomTypeItem[]>(matchingHotel?.roomTypes || [
+    { id: 'rt-1', name: 'Camera Matrimoniale Deluxe', pricePerNight: matchingHotel?.negotiatedRate || 350, totalBlocked: 20, availableRooms: 15, maxOccupancy: 2 }
+  ]);
+  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomOccupancy, setNewRoomOccupancy] = useState(2);
+  const [newRoomTotal, setNewRoomTotal] = useState(10);
+  const [hotelSaveSuccess, setHotelSaveSuccess] = useState<string | null>(null);
+
+  // Sincronizza lo stato locale quando cambia il fornitore selezionato
+  useEffect(() => {
+    if (matchingHotel) {
+      setHotelName(matchingHotel.name);
+      setHotelStars(matchingHotel.stars);
+      setHotelAddress(matchingHotel.address);
+      setHotelWebsiteUrl(matchingHotel.websiteUrl || '');
+      setHotelDistance(matchingHotel.distanceToVenue || '');
+      setHotelPerk(matchingHotel.negotiatedPerk || '');
+      setHotelRoomTypes(matchingHotel.roomTypes || []);
+    } else if (currentSupplier) {
+      setHotelName(currentSupplier.name);
+      setHotelCity(currentSupplier.city);
+      setHotelContact(currentSupplier.contactPerson);
+      setHotelPhone(currentSupplier.phone);
+      setHotelEmail(currentSupplier.email);
+    }
+  }, [currentSupplierId, matchingHotel?.id]);
+
+  // Salvataggio Scheda Struttura
+  const handleSaveHotelDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentSupplier) return;
+
+    if (onUpdateSuppliers) {
+      const updatedSups = suppliers.map(s => {
+        if (s.id === currentSupplier.id) {
+          return {
+            ...s,
+            name: hotelName.trim(),
+            city: hotelCity.trim(),
+            address: hotelAddress.trim(),
+            contactPerson: hotelContact.trim(),
+            phone: hotelPhone.trim(),
+            email: hotelEmail.trim(),
+            notes: hotelDescription.trim(),
+            websiteUrl: hotelWebsiteUrl.trim(),
+            negotiatedPerk: hotelPerk.trim()
+          };
+        }
+        return s;
+      });
+      onUpdateSuppliers(updatedSups);
+    }
+
+    if (onUpdateWeddings) {
+      const updatedWeddings = weddings.map(w => {
+        const hotelIdx = w.hotels.findIndex(h => 
+          h.supplierId === currentSupplier.id || 
+          h.name.toLowerCase().includes(currentSupplier.name.toLowerCase().substring(0, 8))
+        );
+        if (hotelIdx >= 0) {
+          const updatedHotels = [...w.hotels];
+          const prevHotel = updatedHotels[hotelIdx];
+          updatedHotels[hotelIdx] = {
+            ...prevHotel,
+            name: hotelName.trim(),
+            stars: hotelStars,
+            address: hotelAddress.trim(),
+            distanceToVenue: hotelDistance.trim(),
+            websiteUrl: hotelWebsiteUrl.trim(),
+            negotiatedPerk: hotelPerk.trim(),
+            roomTypes: hotelRoomTypes
+          };
+          return { ...w, hotels: updatedHotels };
+        }
+        return w;
+      });
+      onUpdateWeddings(updatedWeddings);
+    }
+
+    setHotelSaveSuccess('Scheda struttura e disponibilità camere salvate con successo! I dati sono aggiornati e a disposizione dell\'agenzia AD Marketing per le quotazioni.');
+    setTimeout(() => setHotelSaveSuccess(null), 5000);
+  };
+
+  const handleAddHotelRoom = () => {
+    if (!newRoomName.trim()) return;
+    const baseRate = matchingHotel?.negotiatedRate || currentSupplier?.standardRate || 350;
+    const newRt: RoomTypeItem = {
+      id: `rt-sup-${Date.now()}`,
+      name: newRoomName.trim(),
+      pricePerNight: baseRate,
+      totalBlocked: Number(newRoomTotal),
+      availableRooms: Number(newRoomTotal),
+      maxOccupancy: Number(newRoomOccupancy)
+    };
+    setHotelRoomTypes(prev => [...prev, newRt]);
+    setNewRoomName('');
+    setShowAddRoomModal(false);
+  };
+
+  const handleRemoveHotelRoom = (id: string) => {
+    setHotelRoomTypes(prev => prev.filter(r => r.id !== id));
+  };
 
   // Aggiungi un tag caratteristica
   const handleAddFeature = () => {
@@ -293,7 +430,7 @@ export default function SupplierPortal({
       {/* Navigazione Schede Fornitore: Menu a Pulsanti Adattivo e Responsive (Nessuno scorrimento orizzontale) */}
       <div className="pt-1 pb-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {/* 1. I Miei Pacchetti */}
+          {/* 1. I Miei Pacchetti O Scheda Struttura Hotel */}
           <button
             onClick={() => setActiveTab('packages')}
             className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 cursor-pointer border ${
@@ -303,17 +440,26 @@ export default function SupplierPortal({
             }`}
           >
             <div className={`p-2 rounded-lg shrink-0 ${activeTab === 'packages' ? 'bg-white/15 text-purple-200' : 'bg-purple-100 text-purple-800'}`}>
-              <Package className="w-4 h-4" />
+              {isHotelSupplier ? <Building2 className="w-4 h-4" /> : <Package className="w-4 h-4" />}
             </div>
             <div className="min-w-0 leading-tight">
               <div className="flex items-center gap-1.5">
-                <span className="block text-xs font-semibold">I Miei Pacchetti</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'packages' ? 'bg-purple-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
-                  {myPackages.length}
+                <span className="block text-xs font-semibold">
+                  {isHotelSupplier ? 'Scheda Struttura & Camere' : 'I Miei Pacchetti'}
                 </span>
+                {!isHotelSupplier && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'packages' ? 'bg-purple-400 text-neutral-900' : 'bg-neutral-100 text-neutral-700'}`}>
+                    {myPackages.length}
+                  </span>
+                )}
+                {isHotelSupplier && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-400 text-neutral-900">
+                    {hotelRoomTypes.length} Camere
+                  </span>
+                )}
               </div>
               <span className={`text-[10px] block mt-0.5 truncate ${activeTab === 'packages' ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                Camere, tour & transfer per l'agenzia
+                {isHotelSupplier ? 'Dettagli, servizi & camere' : 'Camere, tour & transfer per l\'agenzia'}
               </span>
             </div>
           </button>
@@ -378,7 +524,381 @@ export default function SupplierPortal({
       {/* ========================================================================= */}
       {/* SCHEDA 1: I MIEI PACCHETTI DISPONIBILI PER L'AGENZIA                     */}
       {/* ========================================================================= */}
-      {activeTab === 'packages' && (
+      {/* SCHEDA 1A: SCHEDA STRUTTURA HOTEL (PER FORNITORI DI CATEGORIA HOTEL)      */}
+      {/* "la struttura ha solo la possibilità di compilare la scheda con tutti i    */}
+      {/* dettagli, il prezzo di riferimento sarà inserito dall'agenzia"            */}
+      {/* ========================================================================= */}
+      {activeTab === 'packages' && isHotelSupplier && (
+        <form onSubmit={handleSaveHotelDetails} className="space-y-6 animate-in fade-in">
+          {/* Header Scheda Struttura */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-purple-700">
+                Scheda Struttura Convenzionata · Concierge Matrimoni
+              </span>
+              <h2 className="text-xl font-serif-luxury font-bold text-neutral-900 mt-0.5">
+                Scheda Informativa & Dettagli Camere · {hotelName}
+              </h2>
+              <p className="text-xs text-neutral-600 mt-0.5">
+                Compila tutti i dettagli della struttura ricettiva e le camere disponibili. Le tariffe di riferimento per gli ospiti sono valutate e stabilite dall'agenzia AD Marketing.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-purple-900 hover:bg-purple-800 rounded-xl transition-colors shadow-xs cursor-pointer self-start sm:self-auto"
+            >
+              <Check className="w-4 h-4" />
+              <span>Salva e Aggiorna Scheda Struttura</span>
+            </button>
+          </div>
+
+          {/* Banner Politica Prezzi */}
+          <div className="p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-900 shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5 text-amber-800" />
+              </div>
+              <div>
+                <h4 className="font-bold text-amber-950 text-sm">
+                  Politica Tariffe Convenzionate & Ruolo Agenzia AD Marketing
+                </h4>
+                <p className="text-amber-900/90 leading-relaxed mt-0.5">
+                  La struttura ricettiva ha solo la possibilità di compilare la scheda con tutti i dettagli descrittivi e le camere disponibili. 
+                  <strong> Il prezzo di riferimento viene inserito dallo staff dell'agenzia AD Marketing</strong>, che in base ai giorni del soggiorno effettua una valutazione e inserisce la quotazione esatta per gli sposi e per ciascun ospite.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {hotelSaveSuccess && (
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{hotelSaveSuccess}</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setHotelSaveSuccess(null)}
+                className="text-emerald-700 hover:text-emerald-950 font-bold ml-2 cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Campi Scheda Informativa Struttura */}
+          <div className="border border-neutral-200 rounded-2xl bg-white p-6 shadow-xs space-y-5">
+            <h3 className="font-serif-luxury font-bold text-base text-neutral-900 border-b border-neutral-100 pb-3">
+              1. Dati Anagrafici & Contatti Struttura
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Nome Struttura / Hotel *</label>
+                <input
+                  type="text"
+                  required
+                  value={hotelName}
+                  onChange={(e) => setHotelName(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Categoria Stelle</label>
+                <select
+                  value={hotelStars}
+                  onChange={(e) => setHotelStars(Number(e.target.value))}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl"
+                >
+                  <option value={3}>3 Stelle</option>
+                  <option value={4}>4 Stelle Superior</option>
+                  <option value={5}>5 Stelle Lusso</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Comune / Città in Puglia *</label>
+                <input
+                  type="text"
+                  required
+                  value={hotelCity}
+                  onChange={(e) => setHotelCity(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-semibold text-neutral-800 mb-1">Indirizzo Completo Struttura</label>
+                <input
+                  type="text"
+                  value={hotelAddress}
+                  onChange={(e) => setHotelAddress(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Distanza dalla Sede Cerimonia</label>
+                <input
+                  type="text"
+                  value={hotelDistance}
+                  onChange={(e) => setHotelDistance(e.target.value)}
+                  placeholder="Es. Sede evento o 8 min con navetta"
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Referente / Contatto</label>
+                <input
+                  type="text"
+                  value={hotelContact}
+                  onChange={(e) => setHotelContact(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Telefono per Urgenze Prenotazioni</label>
+                <input
+                  type="text"
+                  value={hotelPhone}
+                  onChange={(e) => setHotelPhone(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-800 mb-1">Email per Ricezione Notifiche</label>
+                <input
+                  type="email"
+                  value={hotelEmail}
+                  onChange={(e) => setHotelEmail(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl font-mono text-purple-900"
+                />
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block font-semibold text-neutral-800 mb-1">
+                  URL Sito Web / Booking Engine Struttura
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={hotelWebsiteUrl}
+                    onChange={(e) => setHotelWebsiteUrl(e.target.value)}
+                    placeholder="https://www.borgoegnazia.it/prenotazioni"
+                    className="flex-1 p-2.5 bg-white border border-neutral-300 rounded-xl font-mono text-xs"
+                  />
+                  {hotelWebsiteUrl && (
+                    <a
+                      href={hotelWebsiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl font-semibold flex items-center gap-1.5 shrink-0"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Verifica Link</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block font-semibold text-neutral-800 mb-1">
+                  Descrizione della Struttura, Dotazioni & Servizi
+                </label>
+                <textarea
+                  rows={3}
+                  value={hotelDescription}
+                  onChange={(e) => setHotelDescription(e.target.value)}
+                  placeholder="Es. Masseria con piscina a sfioro tra gli ulivi secolari, centro benessere SPA, colazione tipica pugliese, parcheggio riservato..."
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block font-semibold text-neutral-800 mb-1">
+                  Benefit / Dettaglio Speciale "Negoziato per Voi dall'Agenzia"
+                </label>
+                <input
+                  type="text"
+                  value={hotelPerk}
+                  onChange={(e) => setHotelPerk(e.target.value)}
+                  placeholder="Es. Bottiglia di Primitivo DOC all'arrivo e Late Check-Out ore 13:00 garantito"
+                  className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sezione Tipologie di Camere */}
+          <div className="border border-neutral-200 rounded-2xl bg-white p-6 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
+              <div>
+                <h3 className="font-serif-luxury font-bold text-base text-neutral-900">
+                  2. Tipologie di Camere nel Blocco Riservato ({hotelRoomTypes.length})
+                </h3>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  La struttura inserisce le tipologie di camera e il numero di camere disponibili. Le tariffe di riferimento sono gestite dall'agenzia AD Marketing.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddRoomModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Aggiungi Tipologia Camera</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {hotelRoomTypes.map((rt) => (
+                <div 
+                  key={rt.id} 
+                  className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-neutral-900 text-sm">{rt.name}</span>
+                      <span className="text-[10px] bg-neutral-200 text-neutral-700 px-2 py-0.5 rounded-full font-semibold">
+                        Max {rt.maxOccupancy} Ospiti
+                      </span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                        Disponibili: {rt.availableRooms} / {rt.totalBlocked}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    {/* Prezzo non modificabile dalla struttura: gestito dall'agenzia */}
+                    <div className="text-right">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <Lock className="w-3 h-3 text-amber-700" />
+                        <span className="font-mono font-bold text-sm bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 text-amber-950">
+                          €{rt.pricePerNight} / notte
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-amber-800 block mt-0.5 font-medium">
+                        (Prezzo stabilito dall'Agenzia)
+                      </span>
+                    </div>
+
+                    {hotelRoomTypes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveHotelRoom(rt.id)}
+                        className="p-2 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-neutral-100 transition-colors"
+                        title="Rimuovi tipologia"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Aggiungi Tipologia Camera */}
+            {showAddRoomModal && (
+              <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 space-y-3 text-xs animate-in fade-in">
+                <div className="font-bold text-purple-950 flex items-center justify-between">
+                  <span>Aggiungi Nuova Tipologia di Camera per il Blocco Nozze</span>
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddRoomModal(false)}
+                    className="text-neutral-400 hover:text-neutral-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-neutral-800 mb-1">Nome Tipologia Camera</label>
+                    <input
+                      type="text"
+                      required
+                      value={newRoomName}
+                      onChange={(e) => setNewRoomName(e.target.value)}
+                      placeholder="Es. Suite Vista Ulivi con Idromassaggio"
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-neutral-800 mb-1">Capienza Massima Ospiti</label>
+                    <select
+                      value={newRoomOccupancy}
+                      onChange={(e) => setNewRoomOccupancy(Number(e.target.value))}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg"
+                    >
+                      <option value={1}>1 Ospite</option>
+                      <option value={2}>2 Ospiti (Matrimoniale)</option>
+                      <option value={3}>3 Ospiti (Tripla)</option>
+                      <option value={4}>4 Ospiti (Family)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-neutral-800 mb-1">Numero Camere Bloccate</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={newRoomTotal}
+                      onChange={(e) => setNewRoomTotal(Number(e.target.value))}
+                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-amber-900 italic">
+                    * Il prezzo di riferimento verrà inserito e gestito dallo staff dell'agenzia AD Marketing.
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddRoomModal(false)}
+                      className="px-3 py-1.5 text-neutral-600 hover:text-neutral-900 rounded-lg"
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddHotelRoom}
+                      className="px-4 py-1.5 bg-purple-900 text-white font-semibold rounded-lg hover:bg-purple-800"
+                    >
+                      Aggiungi alla Scheda
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottone Salvataggio Finale */}
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              className="px-6 py-3 text-xs font-semibold text-white bg-purple-900 hover:bg-purple-800 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>Salva e Aggiorna Scheda Struttura</span>
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SCHEDA 1B: I MIEI PACCHETTI DISPONIBILI (PER ALTRI FORNITORI NON HOTEL)   */}
+      {/* ========================================================================= */}
+      {activeTab === 'packages' && !isHotelSupplier && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

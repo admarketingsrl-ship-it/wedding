@@ -37,7 +37,8 @@ import {
   XCircle,
   FileText,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Tag
 } from 'lucide-react';
 import { 
   WeddingData, 
@@ -123,6 +124,16 @@ export default function GuestPortal({
 
   // Stato Invio Voucher Email
   const [emailSentStatus, setEmailSentStatus] = useState<{ sent: boolean; message: string; timestamp?: string } | null>(null);
+
+  // Modale Esito "Conferma e Invia" con spiegazione Prima Ipotesi & Conferma Ufficiale Agenzia
+  const [guestConfirmSuccessModal, setGuestConfirmSuccessModal] = useState<{
+    show: boolean;
+    hotelTitle?: string;
+    hotelDates?: string;
+    hotelEstimate?: number;
+    totalDueImmediate?: number;
+    itemsCount: number;
+  } | null>(null);
 
   // Stato Calcolatore Booking Engine Struttura / Booking.com
   const [calcAdults, setCalcAdults] = useState<number>(2);
@@ -307,14 +318,27 @@ export default function GuestPortal({
     }[] = [];
 
     // 1. Hotel
+    let hotelEstimateForModal: number | undefined = undefined;
+    let hotelTitleForModal: string | undefined = undefined;
+    let hotelDatesForModal: string | undefined = undefined;
+
     if (wantsHotel && currentHotel) {
+      const currentRt = currentHotel.roomTypes.find(rt => rt.name === selectedRoomTypeName) || currentHotel.roomTypes[0];
+      const hotelRatePerNight = currentRt ? currentRt.pricePerNight : currentHotel.negotiatedRate;
+      const nightsCount = calculateNights();
+      const hotelEstimatedTotal = hotelRatePerNight * nightsCount;
+
+      hotelEstimateForModal = hotelEstimatedTotal;
+      hotelTitleForModal = `${currentHotel.name} - ${selectedRoomTypeName}`;
+      hotelDatesForModal = `${checkIn} → ${checkOut} (${nightsCount} notti)`;
+
       items.push({
         category: 'HOTEL',
         title: `${currentHotel.name} - ${selectedRoomTypeName}`,
-        details: `Check-in: ${checkIn} | Check-out: ${checkOut} (${calculateNights()} notti) · ${calcAdults} Adulti, ${calcChildren} Ragazzi`,
-        cost: currentHotel.negotiatedRate * calculateNights(),
+        details: `Check-in: ${checkIn} | Check-out: ${checkOut} (${nightsCount} notti) · ${calcAdults} Adulti${calcChildren > 0 ? `, ${calcChildren} Ragazzi` : ''}`,
+        cost: hotelEstimatedTotal,
         freeByCouple: false,
-        cancellationPolicy: `Restrizione Amministratore: Cancellazione gratuita fino al ${currentHotel.bookingDeadline || '15 Luglio 2026'}. Successivamente è trattenuta la prima notte.`,
+        cancellationPolicy: `Tariffa di riferimento AD Marketing: €${hotelRatePerNight}/notte. Prima ipotesi di prezzo: €${hotelEstimatedTotal}. La quotazione esatta e le istruzioni di saldo verranno inviate via mail dall'agenzia dopo la valutazione dei giorni. Cancellazione gratuita fino al ${currentHotel.bookingDeadline || '15 Luglio 2026'}.`,
         canCancel: true,
         canModify: true,
         deadlineDate: currentHotel.bookingDeadline || '2026-07-15'
@@ -392,8 +416,15 @@ export default function GuestPortal({
     // Esegui anche notifica email e ordini fornitori
     handleSendVoucherEmail();
 
-    // Sposta l'utente sulla visualizzazione della scheda confermata
-    setActiveTab('itinerary');
+    // Mostra modale esplicativo del flusso: prima ipotesi inviata & successiva conferma ufficiale via email
+    setGuestConfirmSuccessModal({
+      show: true,
+      hotelTitle: hotelTitleForModal,
+      hotelDates: hotelDatesForModal,
+      hotelEstimate: hotelEstimateForModal,
+      totalDueImmediate: calculateTotalDue(),
+      itemsCount: items.length
+    });
   };
 
   // Annulla una voce confermata in base alle restrizioni
@@ -462,6 +493,11 @@ export default function GuestPortal({
     // 1. Hotel Partner
     if (wantsHotel && currentHotel) {
       const sup = suppliers.find(s => s.id === currentHotel.supplierId || s.name.toLowerCase().includes('borgo') || s.category === 'HOTEL') || suppliers[0];
+      const currentRt = currentHotel.roomTypes.find(rt => rt.name === selectedRoomTypeName) || currentHotel.roomTypes[0];
+      const hotelRatePerNight = currentRt ? currentRt.pricePerNight : currentHotel.negotiatedRate;
+      const nightsCount = calculateNights();
+      const hotelEstimatedTotal = hotelRatePerNight * nightsCount;
+
       const hotelOrder: SupplierBookingOrder = {
         id: `ord-hotel-${Date.now()}`,
         supplierId: sup.id,
@@ -475,8 +511,13 @@ export default function GuestPortal({
         serviceTitle: `${currentHotel.name} - ${selectedRoomTypeName}`,
         serviceCategory: 'HOTEL',
         dateRequested: `${checkIn} al ${checkOut}`,
-        participantsOrQuantity: 1,
-        totalAmount: currentHotel.negotiatedRate * 3,
+        roomType: selectedRoomTypeName,
+        checkIn: checkIn,
+        checkOut: checkOut,
+        nights: nightsCount,
+        participantsOrQuantity: calcAdults + calcChildren,
+        totalAmount: hotelEstimatedTotal,
+        isHotelEstimate: true,
         currency: 'EUR',
         guestNotes: hotelSpecialRequests || 'Nessuna preferenza specificata',
         status: 'RECEIVED',
@@ -1156,165 +1197,157 @@ export default function GuestPortal({
                 })}
               </div>
 
-              {/* Date di Soggiorno & Calcolatore Rapido Booking Engine */}
-              <div className="p-5 rounded-2xl bg-neutral-50/80 border border-neutral-200/90 space-y-4 text-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
-                  <div>
-                    <span className="font-bold text-neutral-900 flex items-center gap-1.5 text-sm">
-                      <Calculator className="w-4 h-4 text-emerald-700" />
-                      <span>Calcolo Rapido Costo Camera & Interrogazione Booking Engine</span>
-                    </span>
-                    <p className="text-neutral-500 text-[11px] mt-0.5">
-                      Specifica numero di ospiti e periodo: il sistema interroga il booking engine della struttura (o Booking.com) ed elabora il preventivo in tempo reale con facoltà di opzionare la struttura.
-                    </p>
-                  </div>
-                  {currentHotel && (
-                    <span className="text-[11px] font-semibold text-neutral-700 bg-white px-2.5 py-1 rounded-lg border border-neutral-200 shrink-0">
-                      Hotel Selezionato: <strong>{currentHotel.name}</strong>
-                    </span>
-                  )}
-                </div>
+              {/* Date di Soggiorno & Calcolo Automatico della Prima Ipotesi di Prezzo */}
+              {(() => {
+                const currentRt = currentHotel?.roomTypes.find(rt => rt.name === selectedRoomTypeName) || currentHotel?.roomTypes[0];
+                const ratePerNight = currentRt ? currentRt.pricePerNight : (currentHotel?.negotiatedRate || 350);
+                const nights = calculateNights();
+                const preliminaryTotal = ratePerNight * nights;
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-neutral-700 font-semibold mb-1">Check-In</label>
-                    <input
-                      type="date"
-                      value={checkIn}
-                      onChange={(e) => setCheckIn(e.target.value)}
-                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-neutral-700 font-semibold mb-1">Check-Out</label>
-                    <input
-                      type="date"
-                      value={checkOut}
-                      onChange={(e) => setCheckOut(e.target.value)}
-                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-neutral-700 font-semibold mb-1">Adulti</label>
-                    <select
-                      value={calcAdults}
-                      onChange={(e) => setCalcAdults(Number(e.target.value))}
-                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
-                    >
-                      {[1, 2, 3, 4, 5, 6].map(num => (
-                        <option key={num} value={num}>{num} Adult{num === 1 ? 'o' : 'i'}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-neutral-700 font-semibold mb-1">Ragazzi / Bambini</label>
-                    <select
-                      value={calcChildren}
-                      onChange={(e) => setCalcChildren(Number(e.target.value))}
-                      className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
-                    >
-                      {[0, 1, 2, 3, 4].map(num => (
-                        <option key={num} value={num}>{num} Ragazz{num === 1 ? 'o' : 'i'}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      disabled={isQueryingBookingEngine || !currentHotel}
-                      onClick={() => currentHotel && handleQueryBookingEngine(currentHotel)}
-                      className="w-full py-2 px-3 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg shadow-2xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      {isQueryingBookingEngine ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Interrogazione...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Calculator className="w-3.5 h-3.5" />
-                          <span>Interroga Booking Engine</span>
-                        </>
+                return (
+                  <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50/90 to-amber-100/60 border border-amber-300 space-y-4 text-xs shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-3">
+                      <div>
+                        <span className="font-bold text-amber-950 flex items-center gap-1.5 text-sm">
+                          <Calculator className="w-4 h-4 text-amber-800" />
+                          <span>Scegli Date di Soggiorno & Ricevi Prima Ipotesi di Prezzo</span>
+                        </span>
+                        <p className="text-amber-900/80 text-[11px] mt-0.5">
+                          Tariffe convenzionate gestite dall'agenzia AD Marketing. Inserisci le tue date per ottenere la prima stima da inviare con "Conferma e Invia".
+                        </p>
+                      </div>
+                      {currentHotel && (
+                        <span className="text-[11px] font-semibold text-amber-950 bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 shrink-0">
+                          Hotel Selezionato: <strong>{currentHotel.name}</strong>
+                        </span>
                       )}
-                    </button>
-                  </div>
-                </div>
+                    </div>
 
-                {/* Box Risultato Preventivo & Disponibilità Booking Engine */}
-                {calculatedQuote && (
-                  <div className="p-4 rounded-xl bg-white border-2 border-emerald-600/60 shadow-xs space-y-3 mt-3 animate-fade-in">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="font-bold text-neutral-900 text-xs">
-                          Disponibilità Verificata: {calculatedQuote.hotelName} ({calculatedQuote.sourceName})
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-neutral-800 font-semibold mb-1">Data Check-In</label>
+                        <input
+                          type="date"
+                          value={checkIn}
+                          onChange={(e) => setCheckIn(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden font-medium text-xs shadow-2xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-800 font-semibold mb-1">Data Check-Out</label>
+                        <input
+                          type="date"
+                          value={checkOut}
+                          onChange={(e) => setCheckOut(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden font-medium text-xs shadow-2xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-800 font-semibold mb-1">Adulti</label>
+                        <select
+                          value={calcAdults}
+                          onChange={(e) => setCalcAdults(Number(e.target.value))}
+                          className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs shadow-2xs"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map(num => (
+                            <option key={num} value={num}>{num} Adult{num === 1 ? 'o' : 'i'}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-neutral-800 font-semibold mb-1">Ragazzi / Bambini</label>
+                        <select
+                          value={calcChildren}
+                          onChange={(e) => setCalcChildren(Number(e.target.value))}
+                          className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs shadow-2xs"
+                        >
+                          {[0, 1, 2, 3, 4].map(num => (
+                            <option key={num} value={num}>{num} Ragazz{num === 1 ? 'o' : 'i'}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* CARD EVIDENZIATA: PRIMA IPOTESI DI PREZZO */}
+                    <div className="p-4 rounded-xl bg-white border-2 border-amber-400 shadow-sm space-y-3 animate-fade-in">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1 rounded-md bg-amber-100 text-amber-900">
+                            <Tag className="w-3.5 h-3.5" />
+                          </span>
+                          <span className="font-bold text-neutral-900 text-xs">
+                            Prima Ipotesi di Prezzo Indicativa (Valutazione Agenzia)
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-amber-900 font-bold bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                          {nights} Notti ({checkIn} → {checkOut})
                         </span>
                       </div>
-                      <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        Tariffa Garantita Convenzionata Nozze
-                      </span>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div>
+                          <span className="text-neutral-500 block text-[11px]">Camera Scelta:</span>
+                          <strong className="text-neutral-900">{selectedRoomTypeName}</strong>
+                        </div>
+                        <div>
+                          <span className="text-neutral-500 block text-[11px]">Tariffa Riferimento:</span>
+                          <strong className="text-neutral-900 font-mono">€{ratePerNight} / notte</strong>
+                        </div>
+                        <div>
+                          <span className="text-neutral-500 block text-[11px]">Ospiti:</span>
+                          <strong className="text-neutral-900">{calcAdults} Adulti{calcChildren > 0 ? `, ${calcChildren} Bambini` : ''}</strong>
+                        </div>
+                        <div>
+                          <span className="text-neutral-500 block text-[11px]">Prima Ipotesi Totale:</span>
+                          <strong className="text-amber-800 text-base font-mono font-bold">€{preliminaryTotal}</strong>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-[11px] text-amber-950 flex items-start gap-2 leading-relaxed">
+                        <Sparkles className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Come funziona la prenotazione:</strong> Questa prima ipotesi indicativa di <strong>€{preliminaryTotal}</strong> verrà inoltrata insieme al resto delle tue scelte cliccando in basso su <strong>"Conferma e Invia"</strong>. Successivamente, lo staff dell'agenzia AD Marketing valuterà le date del soggiorno e <strong>ti invierà via mail la conferma ufficiale per il pagamento</strong>.
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-neutral-100">
+                        <span className="text-[11px] text-emerald-800 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Camera inclusa nella richiesta da confermare</span>
+                        </span>
+
+                        {currentHotel?.websiteUrl && (
+                          <a
+                            href={currentHotel.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-neutral-600 hover:text-neutral-900 underline"
+                          >
+                            <span>Vedi sito struttura ({currentHotel.name})</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div>
-                        <span className="text-neutral-500 block text-[11px]">Durata:</span>
-                        <strong className="text-neutral-900">{calculatedQuote.nights} Notti</strong>
-                        <span className="text-[10px] text-neutral-400 block">({checkIn} → {checkOut})</span>
-                      </div>
-                      <div>
-                        <span className="text-neutral-500 block text-[11px]">Ospiti:</span>
-                        <strong className="text-neutral-900">{calcAdults} Adulti, {calcChildren} Ragazzi</strong>
-                      </div>
-                      <div>
-                        <span className="text-neutral-500 block text-[11px]">Costo per Notte:</span>
-                        <strong className="text-neutral-900">€{calculatedQuote.pricePerNight}</strong>
-                      </div>
-                      <div>
-                        <span className="text-neutral-500 block text-[11px]">Totale Preventivato:</span>
-                        <strong className="text-emerald-700 text-sm font-mono">€{calculatedQuote.totalAmount}</strong>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-neutral-100">
-                      <a
-                        href={calculatedQuote.directBookingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs text-neutral-700 hover:text-neutral-900 underline"
-                      >
-                        <span>Apri pagina prenotazione esterna ({calculatedQuote.sourceName})</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={handleSelectCalculatedQuote}
-                        className="w-full sm:w-auto px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Opziona Questa Struttura nel Riepilogo</span>
-                      </button>
+                    <div className="pt-1">
+                      <label className="block text-neutral-800 font-semibold mb-1">
+                        Richieste Speciali per l'Hotel (Note camera, culla, piano alto, orario di arrivo...)
+                      </label>
+                      <input
+                        type="text"
+                        value={hotelSpecialRequests}
+                        onChange={(e) => setHotelSpecialRequests(e.target.value)}
+                        placeholder="Es. Letto matrimoniale, culla per bebè, piano alto, arrivo previsto ore 18:00..."
+                        className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs shadow-2xs"
+                      />
                     </div>
                   </div>
-                )}
-
-                <div className="pt-2">
-                  <label className="block text-neutral-700 font-semibold mb-1">
-                    Richieste Speciali per l'Hotel (Note camera, culla, arrivo tardivo...)
-                  </label>
-                  <input
-                    type="text"
-                    value={hotelSpecialRequests}
-                    onChange={(e) => setHotelSpecialRequests(e.target.value)}
-                    placeholder="Es. Letto matrimoniale, culla per bebè, piano alto, arrivo serale..."
-                    className="w-full p-2 bg-white border border-neutral-300 rounded-lg focus:outline-hidden"
-                  />
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 

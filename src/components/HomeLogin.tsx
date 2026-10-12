@@ -19,7 +19,12 @@ import {
   ArrowLeft,
   UserCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Hotel,
+  Send,
+  Copy,
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 import { ADMIN_CREDENTIALS, WeddingData, MasterSupplier } from '../data/weddingStore';
 import heroBanner from '../assets/images/wedding_concierge_hero_1791309110090.jpg';
@@ -31,9 +36,26 @@ interface HomeLoginProps {
   onCoupleLogin: (weddingCode: string, rememberMe?: boolean) => void;
   onAdminLogin: (rememberMe?: boolean) => void;
   onSupplierLogin: (supplierId: string, rememberMe?: boolean) => void;
+  onRegisterHotel?: (hotelData: {
+    name: string;
+    stars: number;
+    city: string;
+    address: string;
+    contactPerson: string;
+    email: string;
+    phone: string;
+    standardRate: number;
+    websiteUrl: string;
+    bookingEngineType: 'DIRECT_ENGINE' | 'BOOKING_COM';
+    roomTypeName: string;
+    roomsBlocked: number;
+    password?: string;
+    negotiatedPerk?: string;
+  }) => void;
   savedSession?: { role: string; name?: string; details?: string } | null;
   onResumeSavedSession?: () => void;
   onClearSavedSession?: () => void;
+  onResetToDemoWedding?: () => void;
 }
 
 export default function HomeLogin({ 
@@ -43,6 +65,8 @@ export default function HomeLogin({
   onCoupleLogin,
   onAdminLogin,
   onSupplierLogin,
+  onRegisterHotel,
+  onResetToDemoWedding,
   savedSession,
   onResumeSavedSession,
   onClearSavedSession
@@ -55,6 +79,36 @@ export default function HomeLogin({
   const [rememberMeCouple, setRememberMeCouple] = useState(true);
   const [rememberMeAdmin, setRememberMeAdmin] = useState(true);
   const [rememberMeSupplier, setRememberMeSupplier] = useState(true);
+
+  // Modalità Fornitore/Hotel: 'login' oppure 'register'
+  const [supplierMode, setSupplierMode] = useState<'login' | 'register'>('login');
+
+  // Campi Registrazione Autonoma Struttura Hotel
+  const [regHotelName, setRegHotelName] = useState('');
+  const [regHotelStars, setRegHotelStars] = useState(5);
+  const [regHotelCity, setRegHotelCity] = useState('Valle d\'Itria, Puglia');
+  const [regHotelAddress, setRegHotelAddress] = useState('');
+  const [regHotelContact, setRegHotelContact] = useState('');
+  const [regHotelEmail, setRegHotelEmail] = useState('');
+  const [regHotelPhone, setRegHotelPhone] = useState('');
+  const [regHotelWebsiteUrl, setRegHotelWebsiteUrl] = useState('');
+  const [regHotelBookingEngineType, setRegHotelBookingEngineType] = useState<'DIRECT_ENGINE' | 'BOOKING_COM'>('DIRECT_ENGINE');
+  const [regHotelRate, setRegHotelRate] = useState(380);
+  const [regHotelRoomType, setRegHotelRoomType] = useState('Camera Matrimoniale Deluxe');
+  const [regHotelRoomsBlocked, setRegHotelRoomsBlocked] = useState(20);
+  const [regHotelPassword, setRegHotelPassword] = useState('fornitore2026');
+  const [regHotelPerk, setRegHotelPerk] = useState('Negoziato per voi dall\'Agenzia: Accesso spa gratuito e colazione pugliese con prodotti a km 0.');
+  const [regHotelError, setRegHotelError] = useState('');
+  const [regHotelSuccessModal, setRegHotelSuccessModal] = useState<{
+    hotelName: string;
+    email: string;
+    password: string;
+    loginUrl: string;
+    bookingEngineUrl: string;
+    sentAt: string;
+    supplierId: string;
+  } | null>(null);
+  const [copiedRegEmail, setCopiedRegEmail] = useState(false);
 
   // Stato Modulo Ospite
   const [guestMode, setGuestMode] = useState<'quick' | 'register'>('quick');
@@ -142,8 +196,8 @@ export default function HomeLogin({
 
   // Demo fill Admin
   const handleFillAdminDemo = () => {
-    setAdminEmail(ADMIN_CREDENTIALS.email);
-    setAdminPassword(ADMIN_CREDENTIALS.password);
+    setAdminEmail(ADMIN_CREDENTIALS.email || 'info@admarketing.it');
+    setAdminPassword(ADMIN_CREDENTIALS.password || 'admin2026');
     setAdminError('');
   };
 
@@ -152,14 +206,18 @@ export default function HomeLogin({
     e.preventDefault();
     setAdminError('');
 
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanPwd = adminPassword.trim();
+
     if (
-      (adminEmail.trim().toLowerCase() === ADMIN_CREDENTIALS.email.toLowerCase() ||
-       adminEmail.trim().toLowerCase() === 'info@admarketing.it') &&
-      adminPassword === ADMIN_CREDENTIALS.password
+      (cleanEmail === 'info@admarketing.it' ||
+       cleanEmail === 'admin@weddingconcierge.it' ||
+       cleanEmail === (ADMIN_CREDENTIALS.email || '').toLowerCase()) &&
+      (cleanPwd === 'admin2026' || cleanPwd === 'WeddingAdmin2026!' || cleanPwd === ADMIN_CREDENTIALS.password)
     ) {
       onAdminLogin(rememberMeAdmin);
     } else {
-      setAdminError('Credenziali non valide. Clicca su "Usa Credenziali Demo" per inserire i dati corretti.');
+      setAdminError('Credenziali non valide. Usa Email: info@admarketing.it e Password: admin2026 (oppure clicca su "Usa Credenziali Demo").');
     }
   };
 
@@ -193,6 +251,66 @@ export default function HomeLogin({
     }
 
     onSupplierLogin(matchedSupplier.id, rememberMeSupplier);
+  };
+
+  // Submit Registrazione Nuova Struttura Hotel
+  const handleHotelRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegHotelError('');
+
+    if (!regHotelName.trim()) {
+      setRegHotelError('Inserisci il nome della struttura ricettiva o hotel.');
+      return;
+    }
+    if (!regHotelEmail.trim()) {
+      setRegHotelError('Inserisci un\'email valida per la gestione delle prenotazioni e l\'accesso al portale.');
+      return;
+    }
+
+    const cleanEmail = regHotelEmail.trim().toLowerCase();
+    const existing = suppliers.find(s => s.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      setRegHotelError('Questa email è già associata a una struttura registrata. Passa alla scheda "Accedi al Portale".');
+      return;
+    }
+
+    const cleanWebsiteUrl = regHotelWebsiteUrl.trim() ||
+      (regHotelBookingEngineType === 'BOOKING_COM'
+        ? `https://www.booking.com/searchresults.it.html?ss=${encodeURIComponent(regHotelName.trim() + ' ' + regHotelCity.trim())}`
+        : `https://www.${regHotelName.toLowerCase().replace(/[^a-z0-9]/g, '')}.it/booking`);
+
+    const newSupplierId = `sup-hotel-${Date.now()}`;
+    const timestampStr = `${new Date().toLocaleDateString('it-IT')} ore ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+
+    if (onRegisterHotel) {
+      onRegisterHotel({
+        name: regHotelName.trim(),
+        stars: Number(regHotelStars),
+        city: regHotelCity.trim(),
+        address: regHotelAddress.trim() || `${regHotelCity.trim()}, Puglia`,
+        contactPerson: regHotelContact.trim() || 'Direzione Hotel',
+        email: cleanEmail,
+        phone: regHotelPhone.trim() || '+39 080 1234567',
+        standardRate: Number(regHotelRate),
+        websiteUrl: cleanWebsiteUrl,
+        bookingEngineType: regHotelBookingEngineType,
+        roomTypeName: regHotelRoomType.trim() || 'Camera Matrimoniale Deluxe',
+        roomsBlocked: Number(regHotelRoomsBlocked),
+        password: regHotelPassword.trim() || 'fornitore2026',
+        negotiatedPerk: regHotelPerk.trim()
+      });
+    }
+
+    // Mostra modale con l'email di benvenuto e istruzioni inviata all'hotel
+    setRegHotelSuccessModal({
+      hotelName: regHotelName.trim(),
+      email: cleanEmail,
+      password: regHotelPassword.trim() || 'fornitore2026',
+      loginUrl: window.location.origin || 'https://apulianweddingconcierge.it',
+      bookingEngineUrl: cleanWebsiteUrl,
+      sentAt: timestampStr,
+      supplierId: newSupplierId
+    });
   };
 
   return (
@@ -279,6 +397,54 @@ export default function HomeLogin({
           </div>
         </div>
       )}
+
+      {/* BANNER TEST REALI & CREDENZIALI AGENZIA */}
+      <div className="max-w-4xl mx-auto p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-800 to-amber-950 text-white shadow-md border border-neutral-700/80">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Pronto per Test Reali & Pubblicazione</span>
+              </span>
+              <span className="text-xs text-amber-300 font-serif-luxury font-bold">
+                1 Matrimonio Demo: {weddings[0]?.coupleNames || 'Sophia Rossi & Liam O\'Connor'}
+              </span>
+            </div>
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              Accesso Staff Agenzia AD Marketing per impostare nuovi matrimoni: Email <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">{ADMIN_CREDENTIALS.email}</strong> · Password <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">{ADMIN_CREDENTIALS.password}</strong>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveRole('admin');
+                setAdminEmail(ADMIN_CREDENTIALS.email);
+                setAdminPassword(ADMIN_CREDENTIALS.password);
+                onAdminLogin(true);
+              }}
+              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold rounded-xl text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Entra come Agenzia (1 Click)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveRole('admin');
+                const el = document.getElementById('login-forms-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Vedi Credenziali
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* ========================================================================= */}
       {/* SELETTORE AREE DI ACCESSO: MENU A PULSANTI ADATTIVO E RESPONSIVE         */}
@@ -762,32 +928,67 @@ export default function HomeLogin({
             </p>
           </div>
 
-          {/* Credenziali Amministrative Provvisorie */}
-          <div className="max-w-md mx-auto p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-xs space-y-2.5">
+          {/* Credenziali Accesso Staff Agenzia AD Marketing */}
+          <div className="max-w-md mx-auto p-4 rounded-xl bg-amber-50/90 border border-amber-300 text-xs space-y-2.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-amber-700" />
-                <span>Credenziali Amministrative Provvisorie</span>
+              <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-amber-800" />
+                <span>Credenziali Accesso Staff Agenzia</span>
               </span>
               <button
                 type="button"
                 onClick={handleFillAdminDemo}
-                className="text-[11px] font-semibold text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                className="text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
               >
-                Usa Credenziali Demo
+                ⚡ Inserisci in 1 Click
               </button>
             </div>
 
-            <div className="space-y-1 font-mono text-[11px] text-amber-950 bg-white/70 p-2.5 rounded border border-amber-200/60">
-              <div className="flex justify-between">
-                <span className="text-neutral-500 font-sans">Email:</span>
-                <span className="font-bold">{ADMIN_CREDENTIALS.email}</span>
+            <div className="space-y-1.5 font-mono text-[11px] text-amber-950 bg-white/90 p-3 rounded-lg border border-amber-200">
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-600 font-sans font-medium">Email Agenzia:</span>
+                <span className="font-bold text-amber-950">{ADMIN_CREDENTIALS.email}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500 font-sans">Password:</span>
-                <span className="font-bold">{ADMIN_CREDENTIALS.password}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-600 font-sans font-medium">Password Accesso:</span>
+                <span className="font-bold text-amber-950">{ADMIN_CREDENTIALS.password}</span>
+              </div>
+              <div className="text-[10px] text-neutral-500 font-sans pt-1 border-t border-amber-100 flex items-center justify-between">
+                <span>Accesso valido anche con: <code className="font-mono">admin@weddingconcierge.it</code></span>
               </div>
             </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  handleFillAdminDemo();
+                  onAdminLogin(rememberMeAdmin);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                <Key className="w-3.5 h-3.5 text-amber-900" />
+                <span>⚡ Accedi Subito con Credenziali Agenzia (1 Click)</span>
+              </button>
+            </div>
+
+            {onResetToDemoWedding && (
+              <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between text-[11px] text-amber-900">
+                <span>Vuoi azzerare i test e lasciare solo il demo?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Vuoi ripristinare il database lasciando unicamente il matrimonio demo di Sophia & Liam?')) {
+                      onResetToDemoWedding();
+                      alert('Database reimpostato con successo! Presente solo il matrimonio demo di Sophia & Liam.');
+                    }
+                  }}
+                  className="font-bold underline hover:text-amber-950 cursor-pointer"
+                >
+                  Ripristina Demo Iniziale
+                </button>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleAdminSubmit} className="max-w-md mx-auto space-y-4">
@@ -881,131 +1082,341 @@ export default function HomeLogin({
           <div className="text-center max-w-lg mx-auto">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-900 text-[11px] font-semibold uppercase tracking-wider mb-2">
               <Package className="w-3.5 h-3.5 text-purple-700" />
-              <span>Accesso Riservato Partner & Fornitori</span>
+              <span>Accesso Riservato Partner & Strutture Ricettive</span>
             </div>
             <h3 className="text-2xl font-serif-luxury font-bold text-neutral-900">
-              Portale Fornitori Convenzionati
+              {supplierMode === 'login' ? 'Portale Fornitori & Hotel Partner' : 'Registra la Tua Struttura Ricettiva'}
             </h3>
             <p className="text-xs text-neutral-600 mt-1">
-              Inserisci le tue credenziali riservate per accedere all'area di gestione pacchetti e visualizzare le prenotazioni ricevute.
+              {supplierMode === 'login'
+                ? 'Accedi alla tua area riservata per gestire la scheda della struttura, consultare le prenotazioni ricevute e confermare le opzioni ospiti.'
+                : 'Compila la scheda informativa con tutti i dettagli e le dotazioni della tua struttura. Il prezzo di riferimento e le quotazioni esatte saranno stabiliti dall\'agenzia in base alle date.'}
             </p>
           </div>
 
-          {/* Form Credenziali Fornitore (SENZA elenco fornitori visibile) */}
-          <form onSubmit={handleSupplierSubmit} className="max-w-md mx-auto space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                Email Aziendale o Codice Fornitore
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  value={supplierInput}
-                  onChange={(e) => setSupplierInput(e.target.value)}
-                  placeholder="Es. booking@borgoegnazia.it oppure sup-borgo"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-medium"
-                  required
-                />
-              </div>
-              <span className="text-[11px] text-neutral-400 mt-1 block">
-                Inserisci l'email o il codice fornitore presente nella mail di attivazione inviata dall'agenzia.
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                Password di Accesso
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
-                <input
-                  type={showSupplierPassword ? "text" : "password"}
-                  value={supplierPassword}
-                  onChange={(e) => setSupplierPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-mono"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSupplierPassword(!showSupplierPassword)}
-                  className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 cursor-pointer"
-                  tabIndex={-1}
-                >
-                  {showSupplierPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <span className="text-[11px] text-neutral-400 mt-1 block">
-                Password predefinita: <strong className="font-mono text-neutral-700">fornitore2026</strong>
-              </span>
-            </div>
-
-            {supplierError && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{supplierError}</span>
-              </div>
-            )}
-
-            {/* Funzione Memoria Fornitore */}
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
-              <input
-                type="checkbox"
-                checked={rememberMeSupplier}
-                onChange={(e) => setRememberMeSupplier(e.target.checked)}
-                className="w-4 h-4 rounded text-purple-700 border-neutral-300 focus:ring-purple-700"
-              />
-              <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
-            </label>
-
+          {/* Selettore Modalità: Login vs Registrazione Struttura */}
+          <div className="flex p-1 bg-purple-50/80 rounded-xl max-w-sm mx-auto border border-purple-200">
             <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors mt-2 cursor-pointer"
+              type="button"
+              onClick={() => setSupplierMode('login')}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                supplierMode === 'login'
+                  ? 'bg-purple-800 text-white shadow-2xs'
+                  : 'text-purple-800 hover:text-purple-950'
+              }`}
             >
-              <span>Accedi all'Area Fornitore</span>
-              <ArrowRight className="w-4 h-4" />
+              Accedi al Portale
             </button>
+            <button
+              type="button"
+              onClick={() => setSupplierMode('register')}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                supplierMode === 'register'
+                  ? 'bg-purple-800 text-white shadow-2xs'
+                  : 'text-purple-800 hover:text-purple-950'
+              }`}
+            >
+              Registra Struttura (Compila Scheda)
+            </button>
+          </div>
 
-            {/* Box Credenziali Demo per test veloci */}
-            <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/70 text-[11px] text-purple-900 space-y-1 mt-3">
-              <div className="font-bold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-purple-700" />
-                  <span>Credenziali Fornitore di Prova:</span>
+          {/* MODALITÀ 1: Form Credenziali Fornitore */}
+          {supplierMode === 'login' && (
+            <form onSubmit={handleSupplierSubmit} className="max-w-md mx-auto space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Email Aziendale o Codice Fornitore
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    value={supplierInput}
+                    onChange={(e) => setSupplierInput(e.target.value)}
+                    placeholder="Es. booking@borgoegnazia.it oppure sup-borgo"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-medium"
+                    required
+                  />
+                </div>
+                <span className="text-[11px] text-neutral-400 mt-1 block">
+                  Inserisci l'email o il codice fornitore presente nella mail di attivazione inviata dall'agenzia.
                 </span>
-                <span className="text-[10px] text-purple-700 font-mono">pwd: fornitore2026</span>
               </div>
-              <div className="flex items-center justify-between text-purple-800 pt-0.5">
-                <span>Hotel: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">booking@borgoegnazia.it</code></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSupplierInput('booking@borgoegnazia.it');
-                    setSupplierPassword('fornitore2026');
-                    setSupplierError('');
-                  }}
-                  className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
-                >
-                  Usa Demo
-                </button>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Password di Accesso
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                  <input
+                    type={showSupplierPassword ? "text" : "password"}
+                    value={supplierPassword}
+                    onChange={(e) => setSupplierPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-9 pr-10 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-700 font-mono"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSupplierPassword(!showSupplierPassword)}
+                    className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showSupplierPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <span className="text-[11px] text-neutral-400 mt-1 block">
+                  Password predefinita: <strong className="font-mono text-neutral-700">fornitore2026</strong>
+                </span>
               </div>
-              <div className="flex items-center justify-between text-purple-800">
-                <span>Transfer NCC: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">info@apuliaviptransfer.it</code></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSupplierInput('info@apuliaviptransfer.it');
-                    setSupplierPassword('fornitore2026');
-                    setSupplierError('');
-                  }}
-                  className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
-                >
-                  Usa Demo
-                </button>
+
+              {supplierError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{supplierError}</span>
+                </div>
+              )}
+
+              {/* Funzione Memoria Fornitore */}
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-600 select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={rememberMeSupplier}
+                  onChange={(e) => setRememberMeSupplier(e.target.checked)}
+                  className="w-4 h-4 rounded text-purple-700 border-neutral-300 focus:ring-purple-700"
+                />
+                <span><strong>Ricordami su questo dispositivo</strong> (Accesso automatico futuro)</span>
+              </label>
+
+              <button
+                type="submit"
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors mt-2 cursor-pointer"
+              >
+                <span>Accedi all'Area Fornitore & Hotel</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              {/* Box Credenziali Demo per test veloci */}
+              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/70 text-[11px] text-purple-900 space-y-1 mt-3">
+                <div className="font-bold flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-purple-700" />
+                    <span>Credenziali Fornitore di Prova:</span>
+                  </span>
+                  <span className="text-[10px] text-purple-700 font-mono">pwd: fornitore2026</span>
+                </div>
+                <div className="flex items-center justify-between text-purple-800 pt-0.5">
+                  <span>Hotel: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">booking@borgoegnazia.it</code></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplierInput('booking@borgoegnazia.it');
+                      setSupplierPassword('fornitore2026');
+                      setSupplierError('');
+                    }}
+                    className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
+                  >
+                    Usa Demo
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-purple-800">
+                  <span>Transfer NCC: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">info@apuliaviptransfer.it</code></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplierInput('info@apuliaviptransfer.it');
+                      setSupplierPassword('fornitore2026');
+                      setSupplierError('');
+                    }}
+                    className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
+                  >
+                    Usa Demo
+                  </button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
+
+          {/* MODALITÀ 2: Compilazione Scheda Struttura da parte dell'Hotel */}
+          {supplierMode === 'register' && (
+            <form onSubmit={handleHotelRegisterSubmit} className="space-y-4 max-w-xl mx-auto text-xs animate-in fade-in">
+              <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-300 text-amber-950 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong>Politica Gestione Prezzi:</strong> La tua struttura compila qui la scheda completa con tutti i dettagli e le tipologie di camera. <strong>Il prezzo di riferimento e le quotazioni esatte verranno inseriti e determinati dallo staff dell'agenzia AD Marketing</strong> in base ai giorni del soggiorno e alla valutazione del periodo delle nozze.
+                </div>
+              </div>
+
+              {regHotelError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{regHotelError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-neutral-800 mb-1">
+                    Nome Struttura Ricettiva / Hotel *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={regHotelName}
+                    onChange={(e) => setRegHotelName(e.target.value)}
+                    placeholder="Es. Masseria Petrarolo / Hotel Villa Rosa"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden font-medium text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Categoria Stelle</label>
+                  <select
+                    value={regHotelStars}
+                    onChange={(e) => setRegHotelStars(Number(e.target.value))}
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  >
+                    <option value={3}>3 Stelle</option>
+                    <option value={4}>4 Stelle Superior</option>
+                    <option value={5}>5 Stelle Lusso</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Comune / Città in Puglia *</label>
+                  <input
+                    type="text"
+                    required
+                    value={regHotelCity}
+                    onChange={(e) => setRegHotelCity(e.target.value)}
+                    placeholder="Es. Fasano (BR), Monopoli, Ostuni..."
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-neutral-800 mb-1">Indirizzo Completo Struttura</label>
+                  <input
+                    type="text"
+                    value={regHotelAddress}
+                    onChange={(e) => setRegHotelAddress(e.target.value)}
+                    placeholder="Es. Contrada Petrarolo s.n., Monopoli (BA)"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Referente / Contatto</label>
+                  <input
+                    type="text"
+                    value={regHotelContact}
+                    onChange={(e) => setRegHotelContact(e.target.value)}
+                    placeholder="Es. Maria Rossi (Direzione)"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Telefono per Urgenze</label>
+                  <input
+                    type="text"
+                    value={regHotelPhone}
+                    onChange={(e) => setRegHotelPhone(e.target.value)}
+                    placeholder="+39 080 1234567"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Email Prenotazioni & Login *</label>
+                  <input
+                    type="email"
+                    required
+                    value={regHotelEmail}
+                    onChange={(e) => setRegHotelEmail(e.target.value)}
+                    placeholder="booking@masseriapetrarolo.it"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Password Personale di Accesso</label>
+                  <input
+                    type="text"
+                    value={regHotelPassword}
+                    onChange={(e) => setRegHotelPassword(e.target.value)}
+                    placeholder="fornitore2026"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-neutral-800 mb-1">
+                    Sito Web o Booking Engine della Struttura (Per verifica disponibilità)
+                  </label>
+                  <input
+                    type="url"
+                    value={regHotelWebsiteUrl}
+                    onChange={(e) => setRegHotelWebsiteUrl(e.target.value)}
+                    placeholder="https://www.masseriapetrarolo.it/booking"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Tipologia Camera Principale</label>
+                  <input
+                    type="text"
+                    value={regHotelRoomType}
+                    onChange={(e) => setRegHotelRoomType(e.target.value)}
+                    placeholder="Es. Camera Deluxe Vista Ulivi"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-800 mb-1">Camere Disponibili per Nozze</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={regHotelRoomsBlocked}
+                    onChange={(e) => setRegHotelRoomsBlocked(Number(e.target.value))}
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-neutral-800 mb-1">
+                    Benefit / Accoglienza Riservata agli Ospiti del Matrimonio
+                  </label>
+                  <input
+                    type="text"
+                    value={regHotelPerk}
+                    onChange={(e) => setRegHotelPerk(e.target.value)}
+                    placeholder="Es. Bottiglia di vino pugliese in camera all'arrivo e late check-out"
+                    className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl focus:outline-hidden text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-[11px] text-purple-900 flex items-center justify-between">
+                <span>Tariffa di riferimento e quotazioni:</span>
+                <span className="font-bold text-purple-950 bg-white px-2 py-0.5 rounded border border-purple-300">
+                  Valutata & Inserita dall'Agenzia AD Marketing
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold text-white bg-purple-800 hover:bg-purple-900 rounded-xl shadow-xs transition-colors cursor-pointer mt-2"
+              >
+                <Check className="w-4 h-4" />
+                <span>Salva Scheda Struttura & Accreditati nel Concierge</span>
+              </button>
+            </form>
+          )}
         </section>
       )}
 
@@ -1274,6 +1685,100 @@ export default function HomeLogin({
             >
               <span>Continua con Face ID / Touch ID</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODALE DI BENVENUTO & CREDENZIALI STRUTTURA HOTEL REGISTRATA             */}
+      {/* ========================================================================= */}
+      {regHotelSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-neutral-200 space-y-5 my-8 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    Scheda Struttura Ricevuta
+                  </span>
+                  <h3 className="text-lg font-serif-luxury font-bold text-neutral-900 leading-tight">
+                    Benvenuto nel Concierge, {regHotelSuccessModal.hotelName}!
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRegHotelSuccessModal(null)}
+                className="p-1 rounded-full text-neutral-400 hover:text-neutral-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 text-xs text-amber-950 space-y-2 leading-relaxed">
+              <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                <ShieldCheck className="w-4 h-4 text-amber-700" />
+                <span>Politica Tariffe Convenzionate AD Marketing:</span>
+              </div>
+              <p>
+                La tua struttura è stata registrata con successo nel sistema con tutti i dettagli e le camere disponibili. 
+                <strong> Il prezzo di riferimento e le quotazioni esatte per gli ospiti saranno inseriti e definiti dallo staff dell'agenzia AD Marketing</strong> in base alle date e alla durata del soggiorno.
+              </p>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <span className="text-neutral-500 font-semibold block text-[11px] uppercase tracking-wider">
+                Credenziali di Accesso Personali:
+              </span>
+
+              <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Email di Accesso:</span>
+                  <code className="font-mono font-bold text-purple-900">{regHotelSuccessModal.email}</code>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Password Predefinita:</span>
+                  <code className="font-mono font-bold text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-300">
+                    {regHotelSuccessModal.password}
+                  </code>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Codice Fornitore:</span>
+                  <code className="font-mono text-neutral-700">{regHotelSuccessModal.supplierId}</code>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`Email: ${regHotelSuccessModal.email}\nPassword: ${regHotelSuccessModal.password}\nLink: ${window.location.origin}`);
+                  setCopiedRegEmail(true);
+                  setTimeout(() => setCopiedRegEmail(false), 3000);
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl border border-neutral-300 hover:bg-neutral-50 font-semibold text-xs text-neutral-700 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedRegEmail ? 'Copiato!' : 'Copia Credenziali'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const hotelId = regHotelSuccessModal.supplierId;
+                  setRegHotelSuccessModal(null);
+                  onSupplierLogin(hotelId, true);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-purple-800 hover:bg-purple-900 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <span>Accedi Subito al Portale Fornitori</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

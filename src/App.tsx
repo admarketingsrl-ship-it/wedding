@@ -40,15 +40,40 @@ import {
   TouristWishRequest,
   ChatMessage,
   PaymentRequest,
-  AdminSettings
+  AdminSettings,
+  HotelItem
 } from './data/weddingStore';
 
 export default function App() {
-  // Database State
-  const [weddings, setWeddings] = useState<WeddingData[]>(INITIAL_WEDDINGS);
+  // Storage key per catalogo matrimoni (v3 pulita con 1 solo matrimonio demo iniziale)
+  const WEDDINGS_STORAGE_KEY = 'apulian_weddings_data_v3';
+
+  // Database State - Persistito per salvare nuovi matrimoni creati dall'agenzia
+  const [weddings, setWeddings] = useState<WeddingData[]>(() => {
+    try {
+      // Pulizia automatica versioni legacy con dati multipli per lasciare ambiente pulito
+      localStorage.removeItem('apulian_weddings_data_v1');
+      localStorage.removeItem('apulian_weddings_data_v2');
+
+      const stored = localStorage.getItem(WEDDINGS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_WEDDINGS;
+  });
   const [suppliers, setSuppliers] = useState<MasterSupplier[]>(INITIAL_SUPPLIERS);
   const [packages, setPackages] = useState<SupplierPackage[]>(INITIAL_SUPPLIER_PACKAGES);
-  const [bookingOrders, setBookingOrders] = useState<SupplierBookingOrder[]>(INITIAL_SUPPLIER_BOOKINGS);
+  const [bookingOrders, setBookingOrders] = useState<SupplierBookingOrder[]>(() => {
+    try {
+      const stored = localStorage.getItem('apulian_booking_orders_v1');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+    return INITIAL_SUPPLIER_BOOKINGS;
+  });
   const [wishRequests, setWishRequests] = useState<TouristWishRequest[]>(INITIAL_WISH_REQUESTS);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(INITIAL_ADMIN_SETTINGS);
@@ -170,7 +195,98 @@ export default function App() {
 
   // Aggiornamento singolo matrimonio (dall'area sposi o admin)
   const handleUpdateSingleWedding = (updatedWedding: WeddingData) => {
-    setWeddings(prev => prev.map(w => w.id === updatedWedding.id ? updatedWedding : w));
+    const updated = weddings.map(w => w.id === updatedWedding.id ? updatedWedding : w);
+    handleUpdateWeddings(updated);
+  };
+
+  // Aggiornamento catalogo matrimoni e salvataggio
+  const handleUpdateWeddings = (updated: WeddingData[]) => {
+    setWeddings(updated);
+    try {
+      localStorage.setItem(WEDDINGS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+  };
+
+  // Ripristino dati demo per pulizia completa
+  const handleResetToDemoWedding = () => {
+    setWeddings(INITIAL_WEDDINGS);
+    try {
+      localStorage.setItem(WEDDINGS_STORAGE_KEY, JSON.stringify(INITIAL_WEDDINGS));
+    } catch {}
+  };
+
+  // Registrazione autonoma hotel dal portale
+  const handleRegisterHotel = (hotelData: {
+    name: string;
+    stars: number;
+    city: string;
+    address: string;
+    contactPerson: string;
+    email: string;
+    phone: string;
+    standardRate: number;
+    websiteUrl: string;
+    bookingEngineType: 'DIRECT_ENGINE' | 'BOOKING_COM';
+    roomTypeName: string;
+    roomsBlocked: number;
+    password?: string;
+    negotiatedPerk?: string;
+  }) => {
+    const newSupId = `sup-hotel-${Date.now()}`;
+    const newSup: MasterSupplier = {
+      id: newSupId,
+      name: hotelData.name,
+      category: 'HOTEL',
+      stars: hotelData.stars,
+      city: hotelData.city,
+      address: hotelData.address,
+      contactPerson: hotelData.contactPerson,
+      email: hotelData.email,
+      phone: hotelData.phone,
+      standardRate: hotelData.standardRate,
+      commissionPercent: 12,
+      notes: 'Struttura registrata direttamente tramite il portale fornitori.',
+      accessPassword: hotelData.password || 'fornitore2026',
+      welcomeEmailSent: true,
+      emailSentAt: new Date().toISOString(),
+      websiteUrl: hotelData.websiteUrl,
+      bookingEngineType: hotelData.bookingEngineType,
+      negotiatedPerk: hotelData.negotiatedPerk,
+      roomTypes: [
+        {
+          id: `rt-${Date.now()}`,
+          name: hotelData.roomTypeName,
+          pricePerNight: hotelData.standardRate,
+          totalBlocked: hotelData.roomsBlocked,
+          availableRooms: hotelData.roomsBlocked,
+          maxOccupancy: 2
+        }
+      ]
+    };
+
+    setSuppliers(prev => [...prev, newSup]);
+
+    const newHotelItem: HotelItem = {
+      id: `hotel-${Date.now()}`,
+      name: hotelData.name,
+      stars: hotelData.stars,
+      address: hotelData.address,
+      distanceToVenue: 'Struttura convenzionata nozze',
+      negotiatedRate: hotelData.standardRate,
+      currency: 'EUR',
+      bookingDeadline: '2026-07-31',
+      groupCode: weddings[0]?.weddingCode || 'WEDDING-PUGLIA',
+      supplierId: newSupId,
+      websiteUrl: hotelData.websiteUrl,
+      bookingEngineType: hotelData.bookingEngineType,
+      negotiatedPerk: hotelData.negotiatedPerk,
+      pricingManagedByAgency: true,
+      agencyPricingNotes: 'Tariffa di riferimento registrata dalla scheda. Lo staff agenzia valuterà i giorni e inserirà la quotazione esatta.',
+      roomTypes: newSup.roomTypes || []
+    };
+
+    const updatedWeddings = weddings.map(w => ({ ...w, hotels: [...w.hotels, newHotelItem] }));
+    handleUpdateWeddings(updatedWeddings);
   };
 
   // Login Amministrazione Agenzia con memoria
@@ -334,9 +450,80 @@ export default function App() {
     setWishRequests(prev => [newWish, ...prev]);
   };
 
-  // Registrazione nuovi ordini ai fornitori quando l'ospite invia il voucher
+  // Aggiornamento ordini di prenotazione e persistenza
+  const handleUpdateBookingOrders = (updated: SupplierBookingOrder[]) => {
+    setBookingOrders(updated);
+    try {
+      localStorage.setItem('apulian_booking_orders_v1', JSON.stringify(updated));
+    } catch {}
+  };
+
+  // Registrazione nuovi ordini ai fornitori quando l'ospite invia il voucher con "Conferma e Invia"
   const handleConfirmBookingToSuppliers = (newOrders: SupplierBookingOrder[]) => {
-    setBookingOrders(prev => [...newOrders, ...prev]);
+    setBookingOrders(prev => {
+      const updated = [...newOrders, ...prev];
+      try {
+        localStorage.setItem('apulian_booking_orders_v1', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Se tra gli ordini c'è una prenotazione hotel con prima ipotesi di prezzo, aggiorna l'ospite nel matrimonio
+    const hotelOrder = newOrders.find(o => o.serviceCategory === 'HOTEL');
+    if (hotelOrder && currentGuest) {
+      setWeddings(prevWeddings => {
+        const targetCode = currentGuest.weddingCode || prevWeddings[0]?.weddingCode;
+        const updatedWeddings = prevWeddings.map(w => {
+          if (w.weddingCode.toUpperCase() === targetCode.toUpperCase()) {
+            const guestIdx = w.guests.findIndex(g => g.email.toLowerCase() === currentGuest.email.toLowerCase());
+            let updatedGuests = [...w.guests];
+            if (guestIdx >= 0) {
+              updatedGuests[guestIdx] = {
+                ...updatedGuests[guestIdx],
+                hotelBooked: hotelOrder.serviceTitle,
+                roomType: hotelOrder.roomType || hotelOrder.serviceTitle,
+                checkInDate: hotelOrder.checkIn,
+                checkOutDate: hotelOrder.checkOut,
+                hotelNights: hotelOrder.nights,
+                hotelEstimatePrice: hotelOrder.totalAmount,
+                hotelBookingStatus: 'QUOTE_REQUESTED',
+                hotelSpecialRequests: hotelOrder.guestNotes
+              };
+            } else {
+              updatedGuests.push({
+                id: `guest-${Date.now()}`,
+                name: currentGuest.name,
+                email: currentGuest.email,
+                phone: '+39 340 1234567',
+                country: currentGuest.country || 'Italia',
+                flag: '🇮🇹',
+                hotelBooked: hotelOrder.serviceTitle,
+                roomType: hotelOrder.roomType || hotelOrder.serviceTitle,
+                transferBooked: '',
+                flight: '',
+                experiences: [],
+                extraServices: [],
+                diet: 'Nessuna intolleranza',
+                status: 'CONFIRMED',
+                totalAmountDue: hotelOrder.totalAmount,
+                paymentStatus: 'PENDING',
+                registeredAt: new Date().toISOString().split('T')[0],
+                checkInDate: hotelOrder.checkIn,
+                checkOutDate: hotelOrder.checkOut,
+                hotelNights: hotelOrder.nights,
+                hotelEstimatePrice: hotelOrder.totalAmount,
+                hotelBookingStatus: 'QUOTE_REQUESTED',
+                hotelSpecialRequests: hotelOrder.guestNotes
+              });
+            }
+            return { ...w, guests: updatedGuests };
+          }
+          return w;
+        });
+        handleUpdateWeddings(updatedWeddings);
+        return updatedWeddings;
+      });
+    }
   };
 
   // Aggiunta nuovo pacchetto da parte del fornitore
@@ -616,6 +803,8 @@ export default function App() {
             onCoupleLogin={handleCoupleLogin}
             onAdminLogin={handleAdminLogin}
             onSupplierLogin={handleSupplierLogin}
+            onRegisterHotel={handleRegisterHotel}
+            onResetToDemoWedding={handleResetToDemoWedding}
             savedSession={savedSessionMeta}
             onResumeSavedSession={handleResumeSavedSession}
             onClearSavedSession={handleClearSavedSession}
@@ -655,10 +844,13 @@ export default function App() {
         {currentView === 'admin' && (
           <AdminPanel 
             weddings={weddings} 
-            onUpdateWeddings={setWeddings}
+            onUpdateWeddings={handleUpdateWeddings}
+            onResetToDemoWedding={handleResetToDemoWedding}
             suppliers={suppliers}
             onUpdateSuppliers={setSuppliers}
             packages={packages}
+            bookingOrders={bookingOrders}
+            onUpdateBookingOrders={handleUpdateBookingOrders}
             wishRequests={wishRequests}
             onUpdateWishRequests={setWishRequests}
             chatMessages={chatMessages}
@@ -682,6 +874,8 @@ export default function App() {
             bookingOrders={bookingOrders}
             onUpdateBookingOrders={setBookingOrders}
             weddings={weddings}
+            onUpdateWeddings={handleUpdateWeddings}
+            onUpdateSuppliers={setSuppliers}
             onLogout={handleLogout}
             onNavigateToAgency={() => {
               setAuthRole('admin');
