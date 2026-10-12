@@ -265,7 +265,7 @@ export default function AdminPanel({
   const [newWedCity, setNewWedCity] = useState('Valle d\'Itria, Puglia');
   const [newWedCode, setNewWedCode] = useState('');
   const [newWedCoupleEmail, setNewWedCoupleEmail] = useState('');
-  const [newWedCouplePassword, setNewWedCouplePassword] = useState('sposi2026');
+  const [newWedCouplePassword, setNewWedCouplePassword] = useState('');
   const [newWedDressCode, setNewWedDressCode] = useState('Puglia Summer Chic & Casual Elegance (Lino, seta e tonalità chiare)');
   const [newWedStory, setNewWedStory] = useState('Ci siamo innamorati della magia della Puglia e non vediamo l\'ora di celebrare il nostro amore insieme a tutti voi!');
   const [newWedWelcomeMessage, setNewWedWelcomeMessage] = useState(
@@ -477,6 +477,7 @@ export default function AdminPanel({
       id: `wed-${Date.now()}`,
       weddingCode: finalCode,
       coupleNames: newWedCoupleNames.trim(),
+      coupleEmail: newWedCoupleEmail.trim(),
       weddingDate: newWedDate,
       venue: newWedVenue.trim(),
       city: newWedCity.trim(),
@@ -487,7 +488,7 @@ export default function AdminPanel({
       conciergeEmail: adminSettings.adminNotificationEmail,
       conciergePhone: adminSettings.agencyPhone,
       conciergeWhatsApp: adminSettings.valeriaPhone,
-      couplePassword: newWedCouplePassword.trim() || 'sposi2026',
+      couplePassword: newWedCouplePassword.trim(),
       dressCode: newWedDressCode.trim(),
       story: newWedStory.trim(),
       hotels: selectedHotelsList,
@@ -521,12 +522,23 @@ export default function AdminPanel({
     onUpdateWeddings(updatedWeddingsList);
     setSelectedWeddingId(newWeddingData.id);
 
-    setNewWedSuccessNotice(
-      `🎉 Matrimonio di "${newWeddingData.coupleNames}" impostato con successo! Codice Nozze attivo: ${finalCode}.`
-    );
+    // Mock Email Invio
+    const sendWelcomeEmail = (email: string, names: string, code: string, password: string) => {
+      console.log(`Mock Email sent to ${email} for wedding ${code} (${names}) with password: ${password}`);
+      // In a real app, this would call an API route (e.g., fetch('/api/send-email', ...))
+    };
+    
+    if (newWedCoupleEmail.trim()) {
+      sendWelcomeEmail(newWedCoupleEmail.trim(), newWedCoupleNames.trim(), finalCode, newWedCouplePassword.trim());
+    }
 
+    setNewWedSuccessNotice(
+      `🎉 Matrimonio di "${newWeddingData.coupleNames}" impostato con successo! Codice Nozze attivo: ${finalCode}. ${newWedCoupleEmail.trim() ? `Un'email di presentazione è stata inviata a ${newWedCoupleEmail.trim()}.` : ''}`
+    );
+    
     // Reset campi modulo
     setNewWedCoupleNames('');
+    setNewWedCoupleEmail('');
     setNewWedCode('');
 
     // Passa alla scheda whatsapp dove l'invito per i nuovi sposi è già pronto
@@ -717,7 +729,7 @@ We cannot wait to toast together under the Puglian stars! ❤️`;
     const hotelId = `hotel-${Date.now()}`;
     const supId = selectedSupplierForHotel || `sup-hotel-${Date.now()}`;
     const cleanHotelEmail = newHotelEmail.trim() || `booking@${newHotelName.toLowerCase().replace(/[^a-z0-9]/g, '')}.it`;
-    const hotelPassword = 'fornitore2026';
+    const hotelPassword = ''; // Password generata automaticamente dal sistema
     const timestampStr = `${new Date().toLocaleDateString('it-IT')} ore ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
 
     // Fallback booking engine URL se non inserito direttamente
@@ -819,14 +831,14 @@ We cannot wait to toast together under the Puglian stars! ❤️`;
     const sup = suppliers.find(s => s.id === hotel.supplierId || s.name === hotel.name) || {
       email: `booking@${hotel.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.it`,
       contactPerson: 'Direzione Hotel',
-      accessPassword: 'fornitore2026'
+      accessPassword: ''
     };
     const timestampStr = `${new Date().toLocaleDateString('it-IT')} ore ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
 
     setHotelEmailModalData({
       hotelName: hotel.name,
       email: sup.email,
-      password: sup.accessPassword || 'fornitore2026',
+      password: sup.accessPassword || '',
       loginUrl: 'https://apulian-wedding-concierge.app/?view=login-fornitore',
       sentAt: timestampStr,
       bookingEngineUrl: hotel.websiteUrl || '',
@@ -2430,7 +2442,7 @@ Tel: ${adminSettings.agencyPhone} | Email: ${adminSettings.adminNotificationEmai
                 <div className="text-[11px] text-amber-900 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-amber-800" />
                   <span>
-                    Al salvataggio verrà generata e inviata l'email con credenziali temporanee (pwd: <code className="font-mono font-bold">fornitore2026</code>) e link al portale.
+                    Al salvataggio verrà generata e inviata l'email con le credenziali d'accesso temporanee e il link al portale.
                   </span>
                 </div>
 
@@ -3744,7 +3756,7 @@ Tel: ${adminSettings.agencyPhone} | Email: ${adminSettings.adminNotificationEmai
                     type="text"
                     value={newWedCouplePassword}
                     onChange={(e) => setNewWedCouplePassword(e.target.value)}
-                    placeholder="sposi2026"
+                    placeholder="Inserisci password"
                     className="w-full p-2.5 bg-white border border-neutral-300 rounded-xl font-mono font-bold focus:outline-hidden"
                   />
                   <span className="text-[10px] text-neutral-400 mt-1 block">

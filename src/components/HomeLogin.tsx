@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Lock, 
   Mail, 
@@ -96,7 +96,7 @@ export default function HomeLogin({
   const [regHotelRate, setRegHotelRate] = useState(380);
   const [regHotelRoomType, setRegHotelRoomType] = useState('Camera Matrimoniale Deluxe');
   const [regHotelRoomsBlocked, setRegHotelRoomsBlocked] = useState(20);
-  const [regHotelPassword, setRegHotelPassword] = useState('fornitore2026');
+  const [regHotelPassword, setRegHotelPassword] = useState('');
   const [regHotelPerk, setRegHotelPerk] = useState('Negoziato per voi dall\'Agenzia: Accesso spa gratuito e colazione pugliese con prodotti a km 0.');
   const [regHotelError, setRegHotelError] = useState('');
   const [regHotelSuccessModal, setRegHotelSuccessModal] = useState<{
@@ -110,33 +110,52 @@ export default function HomeLogin({
   } | null>(null);
   const [copiedRegEmail, setCopiedRegEmail] = useState(false);
 
-  // Stato Modulo Ospite
+  // Modale e Richiesta Recupero Credenziali (info@admarketing.it)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryRole, setRecoveryRole] = useState<'guest' | 'couple' | 'supplier' | 'admin'>('guest');
+  const [copiedRecoveryEmail, setCopiedRecoveryEmail] = useState(false);
+
+  // Stato Modulo Ospite (Inizializzato vuoto per non esporre credenziali altrui)
   const [guestMode, setGuestMode] = useState<'quick' | 'register'>('quick');
-  const [guestName, setGuestName] = useState('Eleanor Vance');
-  const [guestEmail, setGuestEmail] = useState('eleanor.vance@gmail.com');
-  const [guestCountry, setGuestCountry] = useState('Stati Uniti (New York)');
-  const [weddingCode, setWeddingCode] = useState('SOPHIA-LIAM-2026');
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestCountry, setGuestCountry] = useState('');
+  const [weddingCode, setWeddingCode] = useState('');
   const [guestError, setGuestError] = useState('');
 
   // Modali Social Login (Google & Apple)
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [showAppleModal, setShowAppleModal] = useState(false);
 
-  // Stato Modulo Sposi
-  const [coupleWeddingCode, setCoupleWeddingCode] = useState(weddings[0]?.weddingCode || 'SOPHIA-LIAM-2026');
-  const [couplePassword, setCouplePassword] = useState('sposi2026');
+  // Stato Modulo Sposi (Nessuna password preimpostata)
+  const [coupleWeddingCode, setCoupleWeddingCode] = useState('');
+  const [couplePassword, setCouplePassword] = useState('');
   const [coupleError, setCoupleError] = useState('');
 
-  // Stato Modulo Amministratore
+  // Stato Modulo Amministratore (Nessun pre-riempimento)
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
 
-  // Stato Modulo Fornitore (Solo caselle per inserire le credenziali!)
-  const [supplierInput, setSupplierInput] = useState('booking@borgoegnazia.it');
-  const [supplierPassword, setSupplierPassword] = useState('fornitore2026');
+  // Stato Modulo Fornitore (Solo campi vuoti)
+  const [supplierInput, setSupplierInput] = useState('');
+  const [supplierPassword, setSupplierPassword] = useState('');
   const [showSupplierPassword, setShowSupplierPassword] = useState(false);
   const [supplierError, setSupplierError] = useState('');
+
+  // Rilevamento automatico codice matrimonio da URL se condiviso dagli sposi (es. ?code=XYZ)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('code') || params.get('wedding');
+      if (urlCode) {
+        setWeddingCode(urlCode.toUpperCase());
+        setCoupleWeddingCode(urlCode.toUpperCase());
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Submit Ospite
   const handleGuestSubmit = (provider: 'google' | 'apple' | 'email', customData?: { name: string; email: string }) => {
@@ -150,7 +169,7 @@ export default function HomeLogin({
 
     const found = weddings.find(w => w.weddingCode.toUpperCase() === cleanCode);
     if (!found) {
-      setGuestError(`Il codice "${cleanCode}" non è stato trovato. Verifica il codice o clicca su uno dei codici suggeriti sotto.`);
+      setGuestError(`Il codice "${cleanCode}" non è stato trovato. Verifica il codice ricevuto dagli sposi o contatta info@admarketing.it per ricevere assistenza.`);
       return;
     }
 
@@ -180,25 +199,18 @@ export default function HomeLogin({
     const found = weddings.find(w => w.weddingCode.toUpperCase() === cleanCode);
 
     if (!found) {
-      setCoupleError(`Nessun matrimonio trovato con il codice "${cleanCode}".`);
+      setCoupleError(`Nessun matrimonio trovato con il codice "${cleanCode}". Per recuperare il vostro codice contattate info@admarketing.it.`);
       return;
     }
 
-    // Verifica password sposi (default: sposi2026 o admin2026)
-    const expectedPassword = found.couplePassword || 'sposi2026';
-    if (couplePassword !== expectedPassword && couplePassword !== 'sposi2026' && couplePassword !== 'admin2026') {
-      setCoupleError('Password sposi non corretta. Usa la password predefinita: sposi2026');
+    // Verifica password sposi
+    const expectedPassword = found.couplePassword;
+    if (couplePassword !== expectedPassword) {
+      setCoupleError('Password non corretta. Per recuperare le credenziali d\'accesso del vostro matrimonio, inviate un\'email a info@admarketing.it.');
       return;
     }
 
     onCoupleLogin(cleanCode, rememberMeCouple);
-  };
-
-  // Demo fill Admin
-  const handleFillAdminDemo = () => {
-    setAdminEmail(ADMIN_CREDENTIALS.email || 'info@admarketing.it');
-    setAdminPassword(ADMIN_CREDENTIALS.password || 'admin2026');
-    setAdminError('');
   };
 
   // Submit Admin
@@ -213,11 +225,11 @@ export default function HomeLogin({
       (cleanEmail === 'info@admarketing.it' ||
        cleanEmail === 'admin@weddingconcierge.it' ||
        cleanEmail === (ADMIN_CREDENTIALS.email || '').toLowerCase()) &&
-      (cleanPwd === 'admin2026' || cleanPwd === 'WeddingAdmin2026!' || cleanPwd === ADMIN_CREDENTIALS.password)
+      (cleanPwd === 'WeddingAdmin2026!' || cleanPwd === ADMIN_CREDENTIALS.password)
     ) {
       onAdminLogin(rememberMeAdmin);
     } else {
-      setAdminError('Credenziali non valide. Usa Email: info@admarketing.it e Password: admin2026 (oppure clicca su "Usa Credenziali Demo").');
+      setAdminError('Credenziali agenzia non valide. Per assistenza o per recuperare la password dello staff contatta info@admarketing.it.');
     }
   };
 
@@ -240,13 +252,13 @@ export default function HomeLogin({
     );
 
     if (!matchedSupplier) {
-      setSupplierError('Nessun fornitore registrato con questa email o codice. Controlla la mail di benvenuto ricevuta dall\'agenzia.');
+      setSupplierError('Nessun fornitore registrato con questa email o codice. Per richiedere le credenziali contatta info@admarketing.it.');
       return;
     }
 
-    const validPassword = matchedSupplier.accessPassword || 'fornitore2026';
-    if (supplierPassword !== validPassword && supplierPassword !== 'fornitore2026' && supplierPassword !== 'admin2026') {
-      setSupplierError('Password errata. Inserisci la password ricevuta nella mail di attivazione (es. fornitore2026).');
+    const validPassword = matchedSupplier.accessPassword;
+    if (supplierPassword !== validPassword) {
+      setSupplierError('Password non corretta. Per recuperare la password della tua struttura contatta info@admarketing.it.');
       return;
     }
 
@@ -296,7 +308,7 @@ export default function HomeLogin({
         bookingEngineType: regHotelBookingEngineType,
         roomTypeName: regHotelRoomType.trim() || 'Camera Matrimoniale Deluxe',
         roomsBlocked: Number(regHotelRoomsBlocked),
-        password: regHotelPassword.trim() || 'fornitore2026',
+        password: regHotelPassword.trim(),
         negotiatedPerk: regHotelPerk.trim()
       });
     }
@@ -305,7 +317,7 @@ export default function HomeLogin({
     setRegHotelSuccessModal({
       hotelName: regHotelName.trim(),
       email: cleanEmail,
-      password: regHotelPassword.trim() || 'fornitore2026',
+      password: regHotelPassword.trim(),
       loginUrl: window.location.origin || 'https://apulianweddingconcierge.it',
       bookingEngineUrl: cleanWebsiteUrl,
       sentAt: timestampStr,
@@ -398,50 +410,16 @@ export default function HomeLogin({
         </div>
       )}
 
-      {/* BANNER TEST REALI & CREDENZIALI AGENZIA */}
-      <div className="max-w-4xl mx-auto p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-neutral-900 via-neutral-800 to-amber-950 text-white shadow-md border border-neutral-700/80">
+      {/* BANNER TEST REALI - AREA AGENZIA */}
+      <div className="max-w-4xl mx-auto p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-neutral-900 to-neutral-800 text-white shadow-md border border-neutral-700/80">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Pronto per Test Reali & Pubblicazione</span>
-              </span>
-              <span className="text-xs text-amber-300 font-serif-luxury font-bold">
-                1 Matrimonio Demo: {weddings[0]?.coupleNames || 'Sophia Rossi & Liam O\'Connor'}
-              </span>
-            </div>
+            <span className="text-xs text-amber-300 font-serif-luxury font-bold">
+              Accesso Staff Agenzia
+            </span>
             <p className="text-xs text-neutral-300 leading-relaxed">
-              Accesso Staff Agenzia AD Marketing per impostare nuovi matrimoni: Email <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">{ADMIN_CREDENTIALS.email}</strong> · Password <strong className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded">{ADMIN_CREDENTIALS.password}</strong>
+              Hai dimenticato le credenziali? Contatta <strong className="text-white">info@admarketing.it</strong> per assistenza.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('admin');
-                setAdminEmail(ADMIN_CREDENTIALS.email);
-                setAdminPassword(ADMIN_CREDENTIALS.password);
-                onAdminLogin(true);
-              }}
-              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold rounded-xl text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Entra come Agenzia (1 Click)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('admin');
-                const el = document.getElementById('login-forms-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs transition-colors cursor-pointer"
-            >
-              Vedi Credenziali
-            </button>
           </div>
         </div>
       </div>
@@ -712,51 +690,7 @@ export default function HomeLogin({
               </div>
             </div>
 
-            {/* Quick Demo Invitati per velocizzare il test */}
-            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
-              <span className="text-[11px] font-semibold text-neutral-500 block mb-1.5 flex items-center gap-1">
-                <UserCheck className="w-3.5 h-3.5 text-neutral-700" />
-                Invitati di test rapido:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGuestName('Eleanor Vance');
-                    setGuestEmail('eleanor.vance@gmail.com');
-                    setGuestCountry('Stati Uniti (New York)');
-                    setWeddingCode('SOPHIA-LIAM-2026');
-                  }}
-                  className="text-[11px] px-2 py-0.5 rounded bg-white border border-neutral-300 hover:border-amber-700 cursor-pointer"
-                >
-                  Eleanor Vance (NY)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGuestName('Aidan Murphy');
-                    setGuestEmail('aidan.murphy@gmail.com');
-                    setGuestCountry('Irlanda (Dublino)');
-                    setWeddingCode('SOPHIA-LIAM-2026');
-                  }}
-                  className="text-[11px] px-2 py-0.5 rounded bg-white border border-neutral-300 hover:border-amber-700 cursor-pointer"
-                >
-                  Aidan Murphy (Dublino)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGuestName('Marco Bellini');
-                    setGuestEmail('marco.bellini@yahoo.it');
-                    setGuestCountry('Italia (Milano)');
-                    setWeddingCode('CHIARA-MATTEO-2026');
-                  }}
-                  className="text-[11px] px-2 py-0.5 rounded bg-white border border-neutral-300 hover:border-amber-700 cursor-pointer"
-                >
-                  Marco Bellini (Milano)
-                </button>
-              </div>
-            </div>
+
 
             {guestError && (
               <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
@@ -853,13 +787,13 @@ export default function HomeLogin({
                   type="password"
                   value={couplePassword}
                   onChange={(e) => setCouplePassword(e.target.value)}
-                  placeholder="sposi2026"
+                  placeholder="Inserisci password"
                   className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-rose-800 font-mono"
                   required
                 />
               </div>
               <span className="text-[11px] text-neutral-400 mt-1 block">
-                Password predefinita di prova: <strong className="font-mono text-neutral-700">sposi2026</strong>
+                Per recuperare le credenziali, contatta <strong className="font-mono text-neutral-700">info@admarketing.it</strong>.
               </span>
             </div>
 
@@ -929,66 +863,16 @@ export default function HomeLogin({
           </div>
 
           {/* Credenziali Accesso Staff Agenzia AD Marketing */}
-          <div className="max-w-md mx-auto p-4 rounded-xl bg-amber-50/90 border border-amber-300 text-xs space-y-2.5 shadow-2xs">
+          <div className="max-w-md mx-auto p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-xs space-y-2.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-amber-950 flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-amber-800" />
-                <span>Credenziali Accesso Staff Agenzia</span>
+              <span className="font-bold text-neutral-950 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-neutral-500" />
+                <span>Richiesta Credenziali</span>
               </span>
-              <button
-                type="button"
-                onClick={handleFillAdminDemo}
-                className="text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                ⚡ Inserisci in 1 Click
-              </button>
             </div>
-
-            <div className="space-y-1.5 font-mono text-[11px] text-amber-950 bg-white/90 p-3 rounded-lg border border-amber-200">
-              <div className="flex justify-between items-center">
-                <span className="text-neutral-600 font-sans font-medium">Email Agenzia:</span>
-                <span className="font-bold text-amber-950">{ADMIN_CREDENTIALS.email}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-neutral-600 font-sans font-medium">Password Accesso:</span>
-                <span className="font-bold text-amber-950">{ADMIN_CREDENTIALS.password}</span>
-              </div>
-              <div className="text-[10px] text-neutral-500 font-sans pt-1 border-t border-amber-100 flex items-center justify-between">
-                <span>Accesso valido anche con: <code className="font-mono">admin@weddingconcierge.it</code></span>
-              </div>
+            <div className="text-[11px] text-neutral-600">
+              Per accedere come staff, inserisci le tue credenziali aziendali. In caso di smarrimento, contatta <strong className="font-semibold text-neutral-900">info@admarketing.it</strong>.
             </div>
-
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  handleFillAdminDemo();
-                  onAdminLogin(rememberMeAdmin);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                <Key className="w-3.5 h-3.5 text-amber-900" />
-                <span>⚡ Accedi Subito con Credenziali Agenzia (1 Click)</span>
-              </button>
-            </div>
-
-            {onResetToDemoWedding && (
-              <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between text-[11px] text-amber-900">
-                <span>Vuoi azzerare i test e lasciare solo il demo?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Vuoi ripristinare il database lasciando unicamente il matrimonio demo di Sophia & Liam?')) {
-                      onResetToDemoWedding();
-                      alert('Database reimpostato con successo! Presente solo il matrimonio demo di Sophia & Liam.');
-                    }
-                  }}
-                  className="font-bold underline hover:text-amber-950 cursor-pointer"
-                >
-                  Ripristina Demo Iniziale
-                </button>
-              </div>
-            )}
           </div>
 
           <form onSubmit={handleAdminSubmit} className="max-w-md mx-auto space-y-4">
@@ -1167,7 +1051,7 @@ export default function HomeLogin({
                   </button>
                 </div>
                 <span className="text-[11px] text-neutral-400 mt-1 block">
-                  Password predefinita: <strong className="font-mono text-neutral-700">fornitore2026</strong>
+                  Per recuperare le credenziali, contatta <strong className="font-mono text-neutral-700">info@admarketing.it</strong>.
                 </span>
               </div>
 
@@ -1197,44 +1081,6 @@ export default function HomeLogin({
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              {/* Box Credenziali Demo per test veloci */}
-              <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/70 text-[11px] text-purple-900 space-y-1 mt-3">
-                <div className="font-bold flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-purple-700" />
-                    <span>Credenziali Fornitore di Prova:</span>
-                  </span>
-                  <span className="text-[10px] text-purple-700 font-mono">pwd: fornitore2026</span>
-                </div>
-                <div className="flex items-center justify-between text-purple-800 pt-0.5">
-                  <span>Hotel: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">booking@borgoegnazia.it</code></span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSupplierInput('booking@borgoegnazia.it');
-                      setSupplierPassword('fornitore2026');
-                      setSupplierError('');
-                    }}
-                    className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
-                  >
-                    Usa Demo
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-purple-800">
-                  <span>Transfer NCC: <code className="font-mono bg-white px-1 py-0.5 rounded border border-purple-200">info@apuliaviptransfer.it</code></span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSupplierInput('info@apuliaviptransfer.it');
-                      setSupplierPassword('fornitore2026');
-                      setSupplierError('');
-                    }}
-                    className="font-bold underline hover:text-purple-950 cursor-pointer ml-2 text-[10px]"
-                  >
-                    Usa Demo
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 

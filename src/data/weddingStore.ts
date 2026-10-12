@@ -304,6 +304,7 @@ export interface WeddingData {
   weddingCode: string;
   coupleNames: string;
   weddingDate: string;
+  coupleEmail?: string;
   venue: string;
   city: string;
   country: string;
@@ -466,7 +467,7 @@ export const INITIAL_WEDDINGS: WeddingData[] = [
     conciergeEmail: 'concierge@admarketing.it',
     conciergePhone: '+39 099 8887766',
     conciergeWhatsApp: '+393401234567',
-    couplePassword: 'sposi2026',
+    couplePassword: '',
     dressCode: 'Puglia Chic & Summer Elegance (Tessuti in lino, seta e cotone. Tonalità sabbia, ulivo e bianco panna. Scarpe comode per prato e chianche in pietra)',
     story: 'Ci siamo innamorati della Puglia durante un viaggio on the road tra gli ulivi secolari della Valle d\'Itria nel 2023. Non vedevamo l\'ora di riportarvi tutti qui con noi per celebrare il nostro amore!',
     schedule: [
