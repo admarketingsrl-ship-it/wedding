@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Email": {
+      "title": "Email",
+      "description": "Email to be sent via trigger email extension",
+      "type": "object",
+      "properties": {
+        "to": { "type": "string" },
+        "message": {
+          "type": "object",
+          "properties": {
+            "subject": { "type": "string" },
+            "html": { "type": "string" }
+          },
+          "required": ["subject", "html"]
+        }
+      },
+      "required": ["to", "message"]
+    }
+  },
+  "firestore": {
+    "/mail/{emailId}": {
+      "schema": "Email",
+      "description": "Collection for Trigger Email extension to send emails"
+    }
+  }
+}

@@ -257,6 +257,28 @@ export default function AdminPanel({
   // Form Impostazioni Email Notifiche
   const [currentNotificationEmail, setCurrentNotificationEmail] = useState(adminSettings.adminNotificationEmail);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+
+  const sendTestEmail = async () => {
+    setTestEmailLoading(true);
+    try {
+      const { db } = await import('../lib/firebase');
+      const { collection, addDoc } = await import('firebase/firestore');
+      await addDoc(collection(db, 'mail'), {
+        to: 'info@admarketing.it',
+        message: {
+          subject: 'Test Email dal Pannello Admin',
+          html: '<h1>Email di test riuscita!</h1><p>Il sistema di notifiche Firebase è correttamente configurato.</p>'
+        }
+      });
+      alert('Email di test inviata con successo a info@admarketing.it');
+    } catch (err) {
+      console.error("Error sending test email:", err);
+      alert('Errore nell\'invio dell\'email di test.');
+    } finally {
+      setTestEmailLoading(false);
+    }
+  };
 
   // Form Creazione / Configurazione Nuovo Matrimonio (Richiesta utente)
   const [newWedCoupleNames, setNewWedCoupleNames] = useState('');
@@ -522,14 +544,27 @@ export default function AdminPanel({
     onUpdateWeddings(updatedWeddingsList);
     setSelectedWeddingId(newWeddingData.id);
 
-    // Mock Email Invio
-    const sendWelcomeEmail = (email: string, names: string, code: string, password: string) => {
-      console.log(`Mock Email sent to ${email} for wedding ${code} (${names}) with password: ${password}`);
-      // In a real app, this would call an API route (e.g., fetch('/api/send-email', ...))
-    };
-    
+    // Invio Email Reale tramite Firestore Trigger Email
     if (newWedCoupleEmail.trim()) {
-      sendWelcomeEmail(newWedCoupleEmail.trim(), newWedCoupleNames.trim(), finalCode, newWedCouplePassword.trim());
+      import('../lib/firebase').then(({ db }) => {
+        import('firebase/firestore').then(({ collection, addDoc }) => {
+          addDoc(collection(db, 'mail'), {
+            to: newWedCoupleEmail.trim(),
+            message: {
+              subject: 'Benvenuti nel vostro portale nozze',
+              html: `
+                <h1>Benvenuti ${newWeddingData.coupleNames}!</h1>
+                <p>È stato creato il vostro portale nozze. Ecco le vostre credenziali:</p>
+                <ul>
+                  <li>Codice Matrimonio: <strong>${finalCode}</strong></li>
+                  <li>Password: <strong>${newWedCouplePassword.trim()}</strong></li>
+                </ul>
+                <p>Potete accedere al vostro portale qui: https://apulian-wedding-concierge.app</p>
+              `
+            }
+          }).catch(err => console.error("Error triggering email:", err));
+        });
+      });
     }
 
     setNewWedSuccessNotice(
@@ -3575,7 +3610,15 @@ Tel: ${adminSettings.agencyPhone} | Email: ${adminSettings.adminNotificationEmai
               </div>
             </div>
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={sendTestEmail}
+                disabled={testEmailLoading}
+                className="px-5 py-2.5 bg-neutral-100 text-neutral-800 font-semibold rounded-xl hover:bg-neutral-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {testEmailLoading ? 'Invio in corso...' : 'Invia Email Test'}
+              </button>
               <button
                 type="submit"
                 className="px-5 py-2.5 bg-neutral-900 text-white font-semibold rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer"
